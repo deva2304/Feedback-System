@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Correlation-Constrained Latent Factor Models for Implicit Feedback Recommendation Systems — AI-powered ad recommendations">
+    <title>AdNeural — AI-Powered Ad Recommendations</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body class="loading-active">
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-orb-container">
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-core"></div>
+    </div>
+    <div class="loading-text" id="loadingText">Initializing Neural Engine</div>
+    <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+    </div>
+</div>
+
+<!-- ═══ PARTICLES ═══ -->
+<div class="particles-container" id="particles"></div>
+<div class="glow-blob glow-blob-1"></div>
+<div class="glow-blob glow-blob-2"></div>
+<div class="glow-blob glow-blob-3"></div>
+
+<!-- ═══ MATRIX RAIN CANVAS (Easter Egg) ═══ -->
+<canvas class="matrix-canvas" id="matrixCanvas"></canvas>
+
+<!-- ═══ KONAMI GAME OVERLAY (Easter Egg) ═══ -->
+<div class="konami-overlay" id="konamiOverlay">
+    <div class="konami-title">🎮 RETRO INVADERS — KONAMI CODE ACTIVATED</div>
+    <canvas id="gameCanvas" width="480" height="360" style="border:1px solid #34d399; border-radius:8px; background:#000;"></canvas>
+    <p style="color:#64748b; font-size:0.8rem; margin-top:12px; font-family:'JetBrains Mono',monospace;">Arrow keys to move, Space to shoot</p>
+    <button class="konami-close" onclick="closeKonami()">EXIT GAME [ESC]</button>
+</div>
+
+<!-- ═══ DEV MODE OVERLAY (Easter Egg) ═══ -->
+<div class="dev-mode-overlay" id="devOverlay">
+    <div class="dev-console">
+        <div class="dev-console-header">
+            <div class="dev-dot" style="background:#f43f5e;"></div>
+            <div class="dev-dot" style="background:#fbbf24;"></div>
+            <div class="dev-dot" style="background:#34d399;"></div>
+            <span style="color:#64748b; font-size:0.8rem; margin-left:8px;">developer_mode.sh</span>
+        </div>
+        <div id="devLines"></div>
+    </div>
+    <button class="konami-close" onclick="document.getElementById('devOverlay').classList.remove('active')" style="margin-top:24px;">CLOSE [ESC]</button>
+</div>
+
+<!-- ═══ CONFETTI CONTAINER ═══ -->
+<div class="confetti-container" id="confettiContainer"></div>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar" id="navbar">
+    <div class="nav-logo" id="navLogo">
+        <div class="nav-logo-icon">🧠</div>
+        <span class="nav-logo-text">AdNeural</span>
+    </div>
+    <ul class="nav-links">
+        <li><a href="/" class="nav-link active">Home</a></li>
+        <li><a href="/analytics" class="nav-link">Analytics</a></li>
+        <li><a href="/about" class="nav-link">About Model</a></li>
+    </ul>
+</nav>
+
+<!-- ═══ HERO SECTION ═══ -->
+<section class="hero">
+    <div class="hero-badge">
+        <span class="dot"></span>
+        Correlation-Constrained Latent Factor Model
+    </div>
+    <h1 class="hero-title">
+        Discover Ads That <br>
+        <span class="gradient-text">Actually Matter</span>
+    </h1>
+    <p class="hero-subtitle">
+        Powered by SVD-decomposed correlation matrices from real user behavioral data. 
+        Select your interest below and let our latent factor engine find your perfect match.
+    </p>
+    <div class="hero-stats">
+        <div class="hero-stat">
+            <div class="hero-stat-value" data-count="{{ total_products }}">0</div>
+            <div class="hero-stat-label">Products</div>
+        </div>
+        <div class="hero-stat">
+            <div class="hero-stat-value" data-count="{{ total_users }}">0</div>
+            <div class="hero-stat-label">Users Analyzed</div>
+        </div>
+        <div class="hero-stat">
+            <div class="hero-stat-value" data-count="{{ total_interactions }}">0</div>
+            <div class="hero-stat-label">Interactions</div>
+        </div>
+    </div>
+    {% if is_live %}
+    <div style="margin-top:20px; display:inline-flex; align-items:center; gap:8px; padding:8px 20px; background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.2); border-radius:9999px; font-size:0.8rem; color:#34d399; font-weight:600;">
+        <span style="width:8px; height:8px; background:#34d399; border-radius:50%; display:inline-block; animation:live-pulse 2s infinite;"></span>
+        LIVE EXCHANGE RATES &middot; Real-time from European Central Bank
+        <span style="color:var(--text-muted); font-weight:400;">&middot; Rates as of: {{ rate_date }}</span>
+    </div>
+    <style>@keyframes live-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}</style>
+    {% endif %}
+</section>
+
+<!-- ═══ CATEGORY SELECTION ═══ -->
+<section class="section">
+    <div class="section-header">
+        <div class="section-label">What are you looking for?</div>
+        <h2 class="section-title">Choose Your Interest</h2>
+        <p class="section-desc">Select a category and our AI will recommend the best ads personalized just for you.</p>
+    </div>
+
+    <form action="/recommend" method="POST" id="categoryForm">
+        <input type="hidden" name="category" id="selectedCategory" value="">
+        <input type="hidden" name="user_id" id="userId" value="">
+
+        <div class="categories-grid">
+            {% for cat in categories %}
+            <div class="category-card" data-category="{{ cat.name }}" onclick="selectCategory('{{ cat.name }}')">
+                <div class="category-check">✓</div>
+                <div class="category-icon">{{ cat.icon }}</div>
+                <div class="category-name">{{ cat.name }}</div>
+                <div class="category-count">{{ cat.count }} products</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- ═══ COUNTRY / REGION SELECTOR ═══ -->
+        <!-- Hidden input carries value to backend -->
+        <input type="hidden" name="country" id="countryHidden" value="US">
+
+        <div class="country-selector-section">
+            <div class="country-selector-label">
+                <span class="country-selector-icon">🌍</span>
+                <span>Select Your Region</span>
+                <span class="country-selector-hint">Prices shown in local currency</span>
+            </div>
+
+            <!-- Custom dropdown (avoids Windows emoji rendering issue in native select) -->
+            <div class="custom-dropdown" id="customDropdown">
+                <div class="custom-dropdown-trigger" id="dropdownTrigger" onclick="toggleDropdown()">
+                    <span id="dropdownSelected">🇺🇸&nbsp;&nbsp;United States &nbsp;<span class="ddccy">USD</span></span>
+                    <span class="dd-arrow" id="ddArrow">▾</span>
+                </div>
+                <div class="custom-dropdown-menu" id="dropdownMenu">
+                    {% for c in countries %}
+                    <div class="custom-dropdown-item {{ 'selected' if c.code == 'US' }}"
+                         data-code="{{ c.code }}"
+                         data-flag="{{ c.flag }}"
+                         data-name="{{ c.name }}"
+                         data-currency="{{ c.currency }}"
+                         onclick="selectCountry('{{ c.code }}', '{{ c.flag }}', '{{ c.name }}', '{{ c.currency }}')">
+                        <span class="dd-flag">{{ c.flag }}</span>
+                        <span class="dd-name">{{ c.name }}</span>
+                        <span class="dd-ccy">{{ c.currency }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick-pick flag row -->
+            <div class="country-flag-preview" id="countryFlagPreview">
+                {% for c in countries %}
+                <span class="flag-chip {{ 'active' if c.code == 'US' }}"
+                      data-code="{{ c.code }}"
+                      title="{{ c.name }} ({{ c.currency }})"
+                      onclick="selectCountry('{{ c.code }}', '{{ c.flag }}', '{{ c.name }}', '{{ c.currency }}')">
+                    {{ c.flag }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="cta-container">
+            <button type="submit" class="btn-cta" id="ctaBtn" disabled>
+                <span>Get My Recommendations</span>
+                <span class="btn-arrow">→</span>
+            </button>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin-top: 14px;">
+                💡 Tip: Powered by {{ total_interactions }} real user behavioral data points
+            </p>
+        </div>
+    </form>
+</section>
+
+<!-- ═══ HIDDEN SEARCH INPUT (Easter Egg: type "latent") ═══ -->
+<div style="position:fixed;bottom:20px;right:20px;z-index:100;">
+    <input type="text" id="secretSearch" placeholder="Search..." style="
+        background: rgba(18,18,40,0.9);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 9999px;
+        padding: 10px 18px;
+        color: #f1f5f9;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        outline: none;
+        width: 160px;
+        transition: 0.3s;
+        backdrop-filter: blur(10px);
+    " onfocus="this.style.borderColor='rgba(124,58,237,0.5)';this.style.width='220px';"
+      onblur="this.style.borderColor='rgba(255,255,255,0.08)';this.style.width='160px';">
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+    <p class="footer-text" id="footerText">
+        Built with <span class="heart">♥</span> using Correlation-Constrained Latent Factor Models — © 2026
+    </p>
+    <div class="footer-links">
+        <a href="/analytics">Analytics Dashboard</a>
+        <a href="/about">About the Model</a>
+    </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════
+// LOADING SCREEN
+// ═══════════════════════════════════════════
+const loadingMessages = [
+    'Initializing Neural Engine',
+    'Loading Correlation Matrix',
+    'Decomposing Latent Factors',
+    'Calibrating SVD Dimensions',
+    'Mapping User Behavioral Space',
+    'Ready!'
+];
+let msgIndex = 0;
+const loadingTextEl = document.getElementById('loadingText');
+const msgInterval = setInterval(() => {
+    msgIndex++;
+    if (msgIndex < loadingMessages.length) {
+        loadingTextEl.textContent = loadingMessages[msgIndex];
+    }
+}, 500);
+
+setTimeout(() => {
+    clearInterval(msgInterval);
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.body.classList.remove('loading-active');
+    startCounterAnimations();
+}, 2800);
+
+// ═══════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════
+const particlesContainer = document.getElementById('particles');
+for (let i = 0; i < 50; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animationDuration = (Math.random() * 15 + 10) + 's';
+    p.style.animationDelay = (Math.random() * 15) + 's';
+    p.style.width = p.style.height = (Math.random() * 3 + 1) + 'px';
+    particlesContainer.appendChild(p);
+}
+
+// ═══════════════════════════════════════════
+// NAVBAR SCROLL
+// ═══════════════════════════════════════════
+window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// ═══════════════════════════════════════════
+// CATEGORY SELECTION
+// ═══════════════════════════════════════════
+let selectedCat = null;
+function selectCategory(cat) {
+    selectedCat = cat;
+    document.getElementById('selectedCategory').value = cat;
+    document.getElementById('ctaBtn').disabled = false;
+
+    // Assign random user_id from data
+    document.getElementById('userId').value = Math.floor(Math.random() * 100) + 1;
+
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.category === cat);
+    });
+}
+
+// ═══════════════════════════════════════════
+// COUNTRY / REGION PICKER (Custom Dropdown)
+// ═══════════════════════════════════════════
+function toggleDropdown() {
+    const menu = document.getElementById('dropdownMenu');
+    const arrow = document.getElementById('ddArrow');
+    const open = menu.classList.toggle('open');
+    arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+function selectCountry(code, flag, name, currency) {
+    // Update hidden input
+    document.getElementById('countryHidden').value = code;
+
+    // Update trigger label
+    document.getElementById('dropdownSelected').innerHTML =
+        flag + '\u00a0\u00a0' + name + ' \u00a0<span class="ddccy">' + currency + '</span>';
+
+    // Highlight active item in menu
+    document.querySelectorAll('.custom-dropdown-item').forEach(item => {
+        item.classList.toggle('selected', item.dataset.code === code);
+    });
+
+    // Highlight active flag chip
+    document.querySelectorAll('.flag-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.code === code);
+    });
+
+    // Close menu
+    document.getElementById('dropdownMenu').classList.remove('open');
+    document.getElementById('ddArrow').style.transform = 'rotate(0deg)';
+}
+
+// Close dropdown if clicking outside
+document.addEventListener('click', function(e) {
+    if (!document.getElementById('customDropdown').contains(e.target)) {
+        document.getElementById('dropdownMenu').classList.remove('open');
+        document.getElementById('ddArrow').style.transform = 'rotate(0deg)';
+    }
+});
+
+// ═══════════════════════════════════════════
+// ANIMATED COUNTERS
+// ═══════════════════════════════════════════
+function startCounterAnimations() {
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseInt(el.dataset.count);
+        const duration = 2000;
+        const start = Date.now();
+        const tick = () => {
+            const elapsed = Date.now() - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const ease = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.floor(target * ease).toLocaleString();
+            if (progress < 1) requestAnimationFrame(tick);
+        };
+        tick();
+    });
+}
+
+// ═══════════════════════════════════════════
+// EASTER EGG 1: KONAMI CODE
+// ═══════════════════════════════════════════
+const konamiSequence = [38,38,40,40,37,39,37,39,66,65]; // ↑↑↓↓←→←→BA
+let konamiIndex = 0;
+document.addEventListener('keydown', (e) => {
+    if (document.getElementById('konamiOverlay').classList.contains('active')) {
+        if (e.key === 'Escape') closeKonami();
+        return;
+    }
+    if (document.getElementById('devOverlay').classList.contains('active')) {
+        if (e.key === 'Escape') document.getElementById('devOverlay').classList.remove('active');
+        return;
+    }
+    if (e.keyCode === konamiSequence[konamiIndex]) {
+        konamiIndex++;
+        if (konamiIndex === konamiSequence.length) {
+            konamiIndex = 0;
+            launchKonami();
+        }
+    } else {
+        konamiIndex = 0;
+    }
+});
+
+function launchKonami() {
+    triggerConfetti();
+    document.getElementById('konamiOverlay').classList.add('active');
+    initGame();
+}
+
+function closeKonami() {
+    document.getElementById('konamiOverlay').classList.remove('active');
+    if (gameLoop) cancelAnimationFrame(gameLoop);
+}
+
+// ── Mini Space Invaders Game ──
+let gameLoop;
+function initGame() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    let player = { x: W/2 - 15, y: H - 40, w: 30, h: 20, speed: 5 };
+    let bullets = [];
+    let enemies = [];
+    let score = 0;
+    let keys = {};
+
+    // Create enemies
+    for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 8; c++) {
+            enemies.push({ x: 30 + c * 52, y: 30 + r * 35, w: 30, h: 20, alive: true });
+        }
+    }
+
+    let enemyDir = 1;
+    let enemySpeed = 0.5;
+
+    document.addEventListener('keydown', e => { keys[e.key] = true; if(e.key===' ') e.preventDefault(); });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    let lastShot = 0;
+
+    function update() {
+        // Player movement
+        if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+        if (keys['ArrowRight'] && player.x < W - player.w) player.x += player.speed;
+
+        // Shooting
+        if (keys[' '] && Date.now() - lastShot > 300) {
+            bullets.push({ x: player.x + player.w/2 - 2, y: player.y, w: 4, h: 10 });
+            lastShot = Date.now();
+        }
+
+        // Bullets
+        bullets.forEach(b => b.y -= 6);
+        bullets = bullets.filter(b => b.y > -10);
+
+        // Enemies movement
+        let hitEdge = false;
+        enemies.forEach(e => {
+            if (!e.alive) return;
+            e.x += enemyDir * enemySpeed;
+            if (e.x <= 0 || e.x + e.w >= W) hitEdge = true;
+        });
+        if (hitEdge) {
+            enemyDir *= -1;
+            enemies.forEach(e => e.y += 15);
+        }
+
+        // Collision
+        bullets.forEach(b => {
+            enemies.forEach(e => {
+                if (!e.alive) return;
+                if (b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
+                    e.alive = false;
+                    b.y = -100;
+                    score += 10;
+                }
+            });
+        });
+    }
+
+    function draw() {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+
+        // Player
+        ctx.fillStyle = '#34d399';
+        ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.fillRect(player.x + player.w/2 - 3, player.y - 8, 6, 8);
+
+        // Bullets
+        ctx.fillStyle = '#fbbf24';
+        bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+        // Enemies
+        enemies.forEach(e => {
+            if (!e.alive) return;
+            ctx.fillStyle = '#f43f5e';
+            ctx.fillRect(e.x, e.y, e.w, e.h);
+            // Eyes
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(e.x + 6, e.y + 6, 5, 5);
+            ctx.fillRect(e.x + 18, e.y + 6, 5, 5);
+        });
+
+        // Score
+        ctx.fillStyle = '#8b5cf6';
+        ctx.font = '16px "JetBrains Mono", monospace';
+        ctx.fillText('SCORE: ' + score, 10, 20);
+    }
+
+    function loop() {
+        update();
+        draw();
+        gameLoop = requestAnimationFrame(loop);
+    }
+    loop();
+}
+
+// ═══════════════════════════════════════════
+// EASTER EGG 2: MATRIX RAIN (Triple-click logo)
+// ═══════════════════════════════════════════
+let logoClickCount = 0;
+let logoClickTimer;
+document.getElementById('navLogo').addEventListener('click', () => {
+    logoClickCount++;
+    clearTimeout(logoClickTimer);
+    logoClickTimer = setTimeout(() => { logoClickCount = 0; }, 500);
+    if (logoClickCount === 3) {
+        logoClickCount = 0;
+        startMatrixRain();
+    }
+});
+
+function startMatrixRain() {
+    const canvas = document.getElementById('matrixCanvas');
+    canvas.classList.add('active');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:<>?LatentFactorSVDcorrelation';
+    const fontSize = 14;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops = Array(columns).fill(1);
+
+    let frameCount = 0;
+    const maxFrames = 300; // ~5 seconds at 60fps
+
+    function drawMatrix() {
+        ctx.fillStyle = 'rgba(6, 6, 15, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#34d399';
+        ctx.font = fontSize + 'px "JetBrains Mono", monospace';
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillStyle = Math.random() > 0.95 ? '#fff' : '#34d399';
+            ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+
+        frameCount++;
+        if (frameCount < maxFrames) {
+            requestAnimationFrame(drawMatrix);
+        } else {
+            canvas.classList.remove('active');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    drawMatrix();
+}
+
+// ═══════════════════════════════════════════
+// EASTER EGG 4: SECRET SEARCH "latent"
+// ═══════════════════════════════════════════
+document.getElementById('secretSearch').addEventListener('input', (e) => {
+    if (e.target.value.toLowerCase() === 'latent') {
+        triggerConfetti();
+        document.querySelectorAll('.category-card').forEach((card, i) => {
+            setTimeout(() => {
+                card.style.transition = 'transform 0.6s cubic-bezier(0.34,1.56,0.64,1)';
+                card.style.transform = 'rotateY(180deg)';
+                setTimeout(() => {
+                    card.style.transform = 'rotateY(0deg)';
+                }, 2000);
+            }, i * 100);
+        });
+        e.target.value = '';
+        e.target.placeholder = '🔓 Latent revealed!';
+        setTimeout(() => { e.target.placeholder = 'Search...'; }, 3000);
+    }
+});
+
+// ═══════════════════════════════════════════
+// EASTER EGG 5: FOOTER CLICK 7x → DEV MODE
+// ═══════════════════════════════════════════
+let footerClicks = 0;
+let footerTimer;
+document.getElementById('footerText').addEventListener('click', () => {
+    footerClicks++;
+    clearTimeout(footerTimer);
+    footerTimer = setTimeout(() => { footerClicks = 0; }, 2000);
+    if (footerClicks >= 7) {
+        footerClicks = 0;
+        showDevMode();
+    }
+});
+
+function showDevMode() {
+    triggerConfetti();
+    const overlay = document.getElementById('devOverlay');
+    overlay.classList.add('active');
+    const linesEl = document.getElementById('devLines');
+    linesEl.innerHTML = '';
+
+    const lines = [
+        '> <span class="comment">// Developer Mode Activated ✨</span>',
+        '> <span class="comment">// Project: AdNeural v2.0</span>',
+        '> console.log(<span class="string">"Correlation-Constrained LF Model"</span>)',
+        '> total_products = <span class="number">{{ total_products }}</span>',
+        '> total_users = <span class="number">{{ total_users }}</span>',
+        '> total_interactions = <span class="number">{{ total_interactions }}</span>',
+        '> latent_dimensions = <span class="number">5</span>',
+        '> svd_rank = <span class="number">8</span>',
+        '> corr_matrix_size = <span class="string">"8x8"</span>',
+        '> model_type = <span class="string">"XGBoost + SVD Hybrid"</span>',
+        '> <span class="comment">// Easter eggs found: Keep exploring! 🥚</span>',
+        '> process.exit(<span class="number">0</span>) <span class="comment">// Have fun!</span>',
+    ];
+
+    lines.forEach((line, i) => {
+        setTimeout(() => {
+            const div = document.createElement('div');
+            div.className = 'dev-console-line';
+            div.style.animationDelay = '0s';
+            div.innerHTML = line;
+            linesEl.appendChild(div);
+        }, i * 200);
+    });
+}
+
+// ═══════════════════════════════════════════
+// CONFETTI BURST
+// ═══════════════════════════════════════════
+function triggerConfetti() {
+    const container = document.getElementById('confettiContainer');
+    const colors = ['#7c3aed','#06b6d4','#ec4899','#34d399','#fbbf24','#f43f5e'];
+    for (let i = 0; i < 80; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+        piece.style.animationDelay = (Math.random() * 0.5) + 's';
+        const size = Math.random() * 8 + 4;
+        piece.style.width = size + 'px';
+        piece.style.height = size + 'px';
+        piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        container.appendChild(piece);
+        setTimeout(() => piece.remove(), 4000);
+    }
+}
+</script>
+
+</body>
+</html>

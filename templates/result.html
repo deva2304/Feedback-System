@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ category }} Recommendations — AdNeural</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <style>@keyframes live-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}</style>
+</head>
+<body class="loading-active">
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-orb-container">
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-core"></div>
+    </div>
+    <div class="loading-text" id="loadingText">Computing Latent Factors</div>
+    <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+    </div>
+</div>
+
+<!-- ═══ PARTICLES ═══ -->
+<div class="particles-container" id="particles"></div>
+<div class="glow-blob glow-blob-1"></div>
+<div class="glow-blob glow-blob-2"></div>
+<div class="glow-blob glow-blob-3"></div>
+
+<!-- ═══ CONFETTI CONTAINER ═══ -->
+<div class="confetti-container" id="confettiContainer"></div>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar" id="navbar">
+    <div class="nav-logo">
+        <div class="nav-logo-icon">🧠</div>
+        <span class="nav-logo-text">AdNeural</span>
+    </div>
+    <ul class="nav-links">
+        <li><a href="/" class="nav-link">Home</a></li>
+        <li><a href="/analytics" class="nav-link">Analytics</a></li>
+        <li><a href="/about" class="nav-link">About Model</a></li>
+    </ul>
+</nav>
+
+<!-- ═══ RESULTS HEADER ═══ -->
+<div class="results-header">
+    <div class="category-badge">{{ category_icon }} {{ category }}</div>
+    <h1>Your <span class="gradient-text">Personalized Ads</span></h1>
+    <p>Our correlation-constrained latent factor model analyzed user behavioral patterns to find the best recommendations for you.</p>
+    <div style="margin-top:16px; display:inline-flex; align-items:center; gap:10px;
+                padding:8px 18px; background:rgba(6,182,212,0.08);
+                border:1px solid rgba(6,182,212,0.2); border-radius:9999px;
+                font-size:0.82rem; color:var(--cyan-400); font-weight:600;">
+        <span style="font-size:1.2rem;">{{ country.flag }}</span>
+        Prices shown in {{ country.name }} &nbsp;·&nbsp; {{ country.currency }} ({{ country.symbol }})
+    </div>
+    {% if is_live %}
+    <div style="margin-top:10px; display:inline-flex; align-items:center; gap:8px;
+                padding:6px 16px; background:rgba(52,211,153,0.08);
+                border:1px solid rgba(52,211,153,0.2); border-radius:9999px;
+                font-size:0.75rem; color:#34d399; font-weight:600;">
+        <span style="width:7px;height:7px;background:#34d399;border-radius:50%;display:inline-block;animation:live-pulse 2s infinite;"></span>
+        LIVE RATES &middot; ECB data: {{ rate_date }}
+    </div>
+    {% endif %}
+</div>
+
+<!-- ═══ INSIGHT CARDS ═══ -->
+<div class="insight-row">
+    <div class="insight-card" style="animation-delay:0.1s;">
+        <div class="insight-card-label">Products Found</div>
+        <div class="insight-card-value purple" data-count="{{ total_products }}">0</div>
+        <div class="insight-card-desc">Matched in {{ category }}</div>
+    </div>
+    <div class="insight-card" style="animation-delay:0.2s;">
+        <div class="insight-card-label">Avg. Relevance</div>
+        <div class="insight-card-value cyan" data-count="{{ avg_relevance }}" data-decimal="true">0</div>
+        <div class="insight-card-desc">CCLF latent dot product</div>
+    </div>
+    <div class="insight-card" style="animation-delay:0.3s;">
+        <div class="insight-card-label">Top Match Score</div>
+        <div class="insight-card-value emerald" data-count="{{ top_score }}" data-decimal="true">0</div>
+        <div class="insight-card-desc">Highest relevance found</div>
+    </div>
+    <div class="insight-card" style="animation-delay:0.4s;">
+        <div class="insight-card-label">Explained Variance</div>
+        <div class="insight-card-value amber" data-count="{{ model_meta.explained_variance }}" data-decimal="true">0</div>
+        <div class="insight-card-desc">SVD factors (k={{ model_meta.k_latent }})</div>
+    </div>
+</div>
+
+<!-- ═══ PRODUCT GRID ═══ -->
+<div class="products-grid" id="productsGrid">
+    {% for product in products %}
+    <div class="product-card" 
+         data-product-id="{{ product.id }}"
+         onmouseenter="startHoverTimer(this)"
+         onmouseleave="clearHoverTimer(this)"
+         style="animation-delay: {{ loop.index0 * 0.06 }}s;">
+        
+        <!-- Secret Deal badge (Easter Egg: hover 5s) -->
+        <div class="secret-deal" id="secret-{{ product.id }}">🎉 SECRET DEAL: Extra 30% OFF!</div>
+
+        <div class="product-img-wrap">
+            <img src="{{ product.image }}" alt="{{ product.name }}" loading="lazy"
+                 onerror="this.src='https://images.unsplash.com/photo-1557821552-17105176677c?w=600&auto=format'">
+            
+            {% if product.tag == 'Trending' %}
+            <span class="product-tag tag-trending">🔥 Trending</span>
+            {% elif product.tag == 'Best Seller' %}
+            <span class="product-tag tag-best-seller">⭐ Best Seller</span>
+            {% elif product.tag == 'Premium' %}
+            <span class="product-tag tag-premium">💎 Premium</span>
+            {% elif product.tag == 'New' %}
+            <span class="product-tag tag-new">🆕 New</span>
+            {% elif product.tag == 'Hot Deal' %}
+            <span class="product-tag tag-hot-deal">🔥 Hot Deal</span>
+            {% elif product.tag == 'Top Rated' %}
+            <span class="product-tag tag-top-rated">⭐ Top Rated</span>
+            {% endif %}
+
+            <!-- Score ring -->
+            <svg class="product-score-ring" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="20" fill="rgba(6,6,15,0.8)" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+                <circle cx="24" cy="24" r="20" fill="none" stroke="url(#scoreGrad-{{ product.id }})" stroke-width="3"
+                        stroke-dasharray="{{ product.relevance * 1.256 }} 126"
+                        stroke-linecap="round" transform="rotate(-90 24 24)"
+                        style="transition: stroke-dasharray 1.5s ease 0.5s;"/>
+                <defs>
+                    <linearGradient id="scoreGrad-{{ product.id }}" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#7c3aed"/>
+                        <stop offset="100%" style="stop-color:#06b6d4"/>
+                    </linearGradient>
+                </defs>
+                <text x="24" y="27" text-anchor="middle" fill="white" font-size="11" font-weight="800"
+                      font-family="Outfit, sans-serif">{{ product.relevance|int }}</text>
+            </svg>
+        </div>
+
+        <div class="product-body">
+            <div class="product-name">{{ product.name }}</div>
+            {% if product.brand %}
+            <div style="font-size:0.68rem; color:var(--purple-400); margin-bottom:2px; font-weight:600; letter-spacing:0.8px; text-transform:uppercase; opacity:0.8;">{{ product.brand }}</div>
+            {% endif %}
+            <div style="margin:4px 0 6px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                <span style="color:#fbbf24; font-size:0.8rem; letter-spacing:-0.5px;">{% set fs = product.rating|int %}{% for i in range(fs) %}★{% endfor %}{% for i in range(5 - fs) %}☆{% endfor %}</span>
+                <span style="font-size:0.7rem; color:var(--text-muted); font-weight:500;">{{ product.rating }}</span>
+                {% if product.discount and product.discount > 0 %}
+                <span style="font-size:0.62rem; background:rgba(239,68,68,0.15); color:#f87171; padding:1px 6px; border-radius:4px; font-weight:700;">-{{ product.discount|int }}%</span>
+                {% endif %}
+            </div>
+            <div class="product-meta">
+                <span class="product-price">{{ product.price }}</span>
+                <span class="product-category-tag">{{ product.category }}</span>
+            </div>
+
+            <div class="product-relevance">
+                <div class="relevance-label">
+                    <span>Relevance</span>
+                    <span>{{ product.relevance }}%</span>
+                </div>
+                <div class="relevance-bar-bg">
+                    <div class="relevance-bar-fill" data-width="{{ product.relevance }}"></div>
+                </div>
+            </div>
+
+            <div class="product-actions">
+                <a href="{{ product.link }}" target="_blank" rel="noopener" class="product-btn product-btn-primary">
+                    View Deal →
+                </a>
+                <button class="product-btn product-btn-outline tooltip" 
+                        data-tooltip="Top signals: {{ product.top_features|join(', ') }}"
+                        onclick="showLatentInfo({{ product.user_latent }}, {{ product.item_latent }}, '{{ product.name }}', {{ product.confidence }}, {{ product.top_features|tojson }})">
+                    🧬 Why?
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ═══ LATENT FACTOR MODAL ═══ -->
+<div id="latentModal" style="
+    position:fixed; inset:0; z-index:5000; background:rgba(0,0,0,0.85);
+    display:none; align-items:center; justify-content:center;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+" onclick="if(event.target===this) this.style.display='none'">
+    <div style="
+        background: var(--bg-card); border:1px solid var(--border-glass);
+        border-radius: var(--radius-lg); padding:36px; max-width:560px; width:90%;
+        backdrop-filter:blur(20px); animation: fade-in-up 0.4s ease;
+        max-height:85vh; overflow-y:auto;
+    ">
+        <h3 style="font-family:'Outfit',sans-serif; margin-bottom:6px; font-size:1.2rem;">
+            🧬 CCLF Recommendation Analysis
+        </h3>
+        <p style="color:var(--text-muted); font-size:0.75rem; margin-bottom:16px;">Correlation-Constrained Latent Factor Model</p>
+        <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:16px; font-weight:600;" id="latentProductName"></p>
+
+        <!-- Confidence Score -->
+        <div style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.15);
+                    border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:0.7rem; color:var(--emerald-400); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Confidence Level</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--emerald-400);" id="confidenceScore"></div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">c = 1 + &alpha; &middot; r &nbsp;|&nbsp; Higher = more implicit signal data</div>
+        </div>
+
+        <!-- Latent Vectors -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+            <div style="background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.12); border-radius:8px; padding:12px;">
+                <div style="font-size:0.7rem; color:var(--purple-400); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">User Latent P<sub>u</sub></div>
+                <div id="userVector" style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--text-secondary);"></div>
+            </div>
+            <div style="background:rgba(6,182,212,0.06); border:1px solid rgba(6,182,212,0.12); border-radius:8px; padding:12px;">
+                <div style="font-size:0.7rem; color:var(--cyan-400); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Item Latent Q<sub>adj,i</sub></div>
+                <div id="itemVector" style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--text-secondary);"></div>
+            </div>
+        </div>
+
+        <!-- Top Driving Features -->
+        <div style="margin-bottom:14px;">
+            <div style="font-size:0.7rem; color:var(--amber-400); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Top Driving Signals</div>
+            <div id="topFeaturesDisplay" style="font-size:0.8rem;"></div>
+        </div>
+
+        <canvas id="radarChart" height="200" style="margin-top:10px;"></canvas>
+        <button onclick="document.getElementById('latentModal').style.display='none'"
+                style="margin-top:16px; width:100%; padding:10px; background:var(--gradient-primary);
+                       border:none; border-radius:var(--radius-md); color:white; font-weight:600;
+                       cursor:pointer; font-family:'Inter',sans-serif;">
+            Close
+        </button>
+    </div>
+</div>
+
+<!-- ═══ BACK BUTTON ═══ -->
+<div style="text-align:center; padding:0 40px 40px; position:relative; z-index:1;">
+    <a href="/" class="btn-secondary">← Back to Categories</a>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+    <p class="footer-text">
+        Built with <span class="heart">♥</span> using Correlation-Constrained Latent Factor Models — © 2026
+    </p>
+</footer>
+
+<!-- Chart.js for radar chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+// ═══ LOADING SCREEN ═══
+const msgs = ['Computing Latent Factors', 'Analyzing Correlation Matrix', 'Ranking Recommendations', 'Almost Ready...'];
+let mi = 0;
+const loadTxt = document.getElementById('loadingText');
+const loadInt = setInterval(() => { mi++; if (mi < msgs.length) loadTxt.textContent = msgs[mi]; }, 500);
+setTimeout(() => {
+    clearInterval(loadInt);
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.body.classList.remove('loading-active');
+    animateBars();
+    startCounters();
+}, 2200);
+
+// ═══ PARTICLES ═══
+const pc = document.getElementById('particles');
+for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random()*100+'%';
+    p.style.animationDuration = (Math.random()*15+10)+'s';
+    p.style.animationDelay = (Math.random()*15)+'s';
+    p.style.width = p.style.height = (Math.random()*3+1)+'px';
+    pc.appendChild(p);
+}
+
+// ═══ NAVBAR SCROLL ═══
+window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// ═══ ANIMATE RELEVANCE BARS ═══
+function animateBars() {
+    document.querySelectorAll('.relevance-bar-fill').forEach(bar => {
+        setTimeout(() => { bar.style.width = bar.dataset.width + '%'; }, 300);
+    });
+}
+
+// ═══ ANIMATED COUNTERS ═══
+function startCounters() {
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseFloat(el.dataset.count);
+        const isDecimal = el.dataset.decimal === 'true';
+        const duration = 1500;
+        const start = Date.now();
+        const tick = () => {
+            const progress = Math.min((Date.now() - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            const val = target * ease;
+            el.textContent = isDecimal ? val.toFixed(1) + '%' : Math.floor(val);
+            if (progress < 1) requestAnimationFrame(tick);
+        };
+        tick();
+    });
+}
+
+// ═══ EASTER EGG 3: HOVER 5s → SECRET DEAL ═══
+let hoverTimers = {};
+function startHoverTimer(card) {
+    const pid = card.dataset.productId;
+    hoverTimers[pid] = setTimeout(() => {
+        const badge = document.getElementById('secret-' + pid);
+        badge.classList.add('revealed');
+        triggerConfetti();
+        setTimeout(() => badge.classList.remove('revealed'), 4000);
+    }, 5000);
+}
+function clearHoverTimer(card) {
+    const pid = card.dataset.productId;
+    clearTimeout(hoverTimers[pid]);
+}
+
+// ═══ CONFETTI ═══
+function triggerConfetti() {
+    const container = document.getElementById('confettiContainer');
+    const colors = ['#7c3aed','#06b6d4','#ec4899','#34d399','#fbbf24','#f43f5e'];
+    for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random()*100+'%';
+        piece.style.background = colors[Math.floor(Math.random()*colors.length)];
+        piece.style.animationDuration = (Math.random()*2+1.5)+'s';
+        piece.style.animationDelay = (Math.random()*0.5)+'s';
+        const size = Math.random()*8+4;
+        piece.style.width = size+'px';
+        piece.style.height = size+'px';
+        piece.style.borderRadius = Math.random()>0.5 ? '50%' : '2px';
+        container.appendChild(piece);
+        setTimeout(() => piece.remove(), 4000);
+    }
+}
+
+// ═══ LATENT FACTOR MODAL ═══
+let radarChartInstance = null;
+function showLatentInfo(userVec, itemVec, name, confidence, topFeatures) {
+    document.getElementById('latentModal').style.display = 'flex';
+    document.getElementById('latentProductName').textContent = name;
+    document.getElementById('userVector').innerHTML = userVec.map((v,i) => '<div>d<sub>' + (i+1) + '</sub> = ' + v + '</div>').join('');
+    document.getElementById('itemVector').innerHTML = itemVec.map((v,i) => '<div>d<sub>' + (i+1) + '</sub> = ' + v + '</div>').join('');
+
+    // Confidence
+    const confEl = document.getElementById('confidenceScore');
+    if (confidence && confidence > 1) {
+        confEl.textContent = confidence.toFixed(1) + ' (high signal)';
+    } else {
+        confEl.textContent = (confidence || 1.0).toFixed(1) + ' (baseline)';
+    }
+
+    // Top features
+    const featEl = document.getElementById('topFeaturesDisplay');
+    if (topFeatures && topFeatures.length) {
+        const colors = {'purchase':'#34d399','add_to_cart':'#06b6d4','click_count':'#8b5cf6',
+                        'view_time_sec':'#ec4899','scroll_depth':'#fbbf24','search_query_count':'#f97316',
+                        'session_duration_sec':'#f43f5e','position':'#94a3b8'};
+        featEl.innerHTML = topFeatures.map(f =>
+            '<span style="display:inline-block; padding:3px 10px; margin:2px; border-radius:6px; font-size:0.75rem; font-weight:600; background:' +
+            (colors[f] || '#8b5cf6') + '20; color:' + (colors[f] || '#8b5cf6') + '; border:1px solid ' + (colors[f] || '#8b5cf6') + '33;">' +
+            f.replace(/_/g, ' ') + '</span>'
+        ).join('');
+    }
+
+    // Dot product score
+    let dotProduct = 0;
+    for (let i = 0; i < userVec.length; i++) dotProduct += userVec[i] * itemVec[i];
+    const relevance = ((dotProduct + 1) / 2 * 100).toFixed(1);
+
+    // Radar chart
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    if (radarChartInstance) radarChartInstance.destroy();
+
+    radarChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Factor 1', 'Factor 2', 'Factor 3', 'Factor 4', 'Factor 5'],
+            datasets: [{
+                label: 'User P\u1d64',
+                data: userVec.map(v => ((v+1)/2)*100),
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139,92,246,0.15)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: '#8b5cf6',
+            }, {
+                label: 'Item Q\u1d62',
+                data: itemVec.map(v => ((v+1)/2)*100),
+                borderColor: '#06b6d4',
+                backgroundColor: 'rgba(6,182,212,0.15)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: '#06b6d4',
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { display: false },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    angleLines: { color: 'rgba(255,255,255,0.08)' },
+                    pointLabels: { color: '#94a3b8', font: { size: 11, family: 'Inter' } }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 }, boxWidth: 12 }
+                }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>

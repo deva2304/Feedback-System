@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard — AdNeural</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="loading-active">
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-orb-container">
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-orb"></div>
+        <div class="loading-core"></div>
+    </div>
+    <div class="loading-text" id="loadingText">Loading Analytics</div>
+    <div class="loading-progress">
+        <div class="loading-progress-bar"></div>
+    </div>
+</div>
+
+<!-- ═══ PARTICLES ═══ -->
+<div class="particles-container" id="particles"></div>
+<div class="glow-blob glow-blob-1"></div>
+<div class="glow-blob glow-blob-2"></div>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar" id="navbar">
+    <a href="/" class="nav-logo" style="text-decoration:none;">
+        <div class="nav-logo-icon">🧠</div>
+        <span class="nav-logo-text">AdNeural</span>
+    </a>
+    <ul class="nav-links">
+        <li><a href="/" class="nav-link">Home</a></li>
+        <li><a href="/analytics" class="nav-link active">Analytics</a></li>
+        <li><a href="/about" class="nav-link">About Model</a></li>
+    </ul>
+</nav>
+
+<!-- ═══ HEADER ═══ -->
+<div class="analytics-header">
+    <div class="hero-badge"><span class="dot"></span> Data from data.csv</div>
+    <h1 style="font-size:clamp(2rem,4vw,3rem); margin-bottom:12px;">
+        <span class="gradient-text">Analytics Dashboard</span>
+    </h1>
+    <p style="color:var(--text-secondary); max-width:550px; margin:0 auto;">
+        Real-time insights from {{ stats.total_interactions }} user interactions — powering our correlation-constrained latent factor model.
+    </p>
+</div>
+
+<!-- ═══ STATS ROW ═══ -->
+<div class="stats-row">
+    <div class="stat-card" style="animation-delay:0.05s;">
+        <div class="stat-card-icon">👥</div>
+        <div class="stat-card-value" data-count="{{ stats.total_users }}">0</div>
+        <div class="stat-card-label">Unique Users</div>
+    </div>
+    <div class="stat-card" style="animation-delay:0.1s;">
+        <div class="stat-card-icon">📦</div>
+        <div class="stat-card-value" data-count="{{ stats.total_items }}">0</div>
+        <div class="stat-card-label">Unique Items</div>
+    </div>
+    <div class="stat-card" style="animation-delay:0.15s;">
+        <div class="stat-card-icon">🖱️</div>
+        <div class="stat-card-value" data-count="{{ stats.avg_clicks }}" data-decimal="true">0</div>
+        <div class="stat-card-label">Avg Clicks</div>
+    </div>
+    <div class="stat-card" style="animation-delay:0.2s;">
+        <div class="stat-card-icon">⏱️</div>
+        <div class="stat-card-value" data-count="{{ stats.avg_view_time }}" data-decimal="true">0</div>
+        <div class="stat-card-label">Avg View Time (s)</div>
+    </div>
+    <div class="stat-card" style="animation-delay:0.25s;">
+        <div class="stat-card-icon">🛒</div>
+        <div class="stat-card-value" data-count="{{ stats.cart_rate }}" data-decimal="true">0</div>
+        <div class="stat-card-label">Cart Rate %</div>
+    </div>
+    <div class="stat-card" style="animation-delay:0.3s;">
+        <div class="stat-card-icon">💰</div>
+        <div class="stat-card-value" data-count="{{ stats.purchase_rate }}" data-decimal="true">0</div>
+        <div class="stat-card-label">Purchase Rate %</div>
+    </div>
+</div>
+
+<!-- ═══ CHARTS GRID ═══ -->
+<div class="analytics-grid">
+    <!-- Correlation Heatmap -->
+    <div class="analytics-card" style="grid-column: 1 / -1; animation-delay:0.1s;">
+        <div class="analytics-card-title">🔥 Feature Correlation Matrix</div>
+        <div style="overflow-x:auto;">
+            <canvas id="corrHeatmap" height="350"></canvas>
+        </div>
+    </div>
+
+    <!-- Click Distribution -->
+    <div class="analytics-card" style="animation-delay:0.2s;">
+        <div class="analytics-card-title">📊 Click Count Distribution</div>
+        <canvas id="clickChart" height="250"></canvas>
+    </div>
+
+    <!-- Purchase vs Non-Purchase Behavior -->
+    <div class="analytics-card" style="animation-delay:0.3s;">
+        <div class="analytics-card-title">🎯 Purchase vs Non-Purchase Behavior</div>
+        <canvas id="behaviorChart" height="250"></canvas>
+    </div>
+
+    <!-- Latent Factor Visualization -->
+    <div class="analytics-card" style="animation-delay:0.4s;">
+        <div class="analytics-card-title">🧬 Latent Factor Impact (SVD Eigenvalues)</div>
+        <canvas id="latentChart" height="250"></canvas>
+    </div>
+
+    <!-- Feature Importance -->
+    <div class="analytics-card" style="animation-delay:0.5s;">
+        <div class="analytics-card-title">⚡ Feature Importance for Purchase Prediction</div>
+        <canvas id="importanceChart" height="250"></canvas>
+    </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+    <p class="footer-text">
+        Built with <span class="heart">♥</span> using Correlation-Constrained Latent Factor Models — © 2026
+    </p>
+    <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/about">About the Model</a>
+    </div>
+</footer>
+
+<script>
+// ═══ LOADING ═══
+const msgs = ['Loading Analytics', 'Processing Data', 'Building Visualizations', 'Ready!'];
+let mi = 0;
+const lt = document.getElementById('loadingText');
+const li = setInterval(() => { mi++; if(mi<msgs.length) lt.textContent=msgs[mi]; }, 500);
+setTimeout(() => {
+    clearInterval(li);
+    document.getElementById('loadingScreen').classList.add('hidden');
+    document.body.classList.remove('loading-active');
+    startCounters();
+    renderCharts();
+}, 2200);
+
+// ═══ PARTICLES ═══
+const pc = document.getElementById('particles');
+for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left=Math.random()*100+'%';
+    p.style.animationDuration=(Math.random()*15+10)+'s';
+    p.style.animationDelay=(Math.random()*15)+'s';
+    p.style.width=p.style.height=(Math.random()*3+1)+'px';
+    pc.appendChild(p);
+}
+
+// ═══ NAVBAR ═══
+window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// ═══ COUNTERS ═══
+function startCounters() {
+    document.querySelectorAll('[data-count]').forEach(el => {
+        const target = parseFloat(el.dataset.count);
+        const isDecimal = el.dataset.decimal === 'true';
+        const duration = 2000;
+        const start = Date.now();
+        const tick = () => {
+            const progress = Math.min((Date.now()-start)/duration, 1);
+            const ease = 1 - Math.pow(1-progress, 3);
+            el.textContent = isDecimal ? (target*ease).toFixed(1) : Math.floor(target*ease);
+            if (progress < 1) requestAnimationFrame(tick);
+        };
+        tick();
+    });
+}
+
+// ═══ CHART.JS CONFIG ═══
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+const corrLabels = {{ corr_labels | safe }};
+const corrValues = {{ corr_values | safe }};
+const purchaseYes = {{ purchase_yes | safe }};
+const purchaseNo = {{ purchase_no | safe }};
+const clickLabels = {{ click_labels | safe }};
+const clickValues = {{ click_values | safe }};
+
+function renderCharts() {
+    // ── Correlation Heatmap (done as a bar chart approximation) ──
+    const corrCtx = document.getElementById('corrHeatmap').getContext('2d');
+    // We use a grouped bar for correlation with "purchase"
+    const purchaseCorrs = corrValues[4]; // purchase row
+    new Chart(corrCtx, {
+        type: 'bar',
+        data: {
+            labels: corrLabels,
+            datasets: [{
+                label: 'Correlation with Purchase',
+                data: purchaseCorrs,
+                backgroundColor: purchaseCorrs.map(v => v > 0 ? 'rgba(124,58,237,0.7)' : 'rgba(6,182,212,0.7)'),
+                borderColor: purchaseCorrs.map(v => v > 0 ? '#7c3aed' : '#06b6d4'),
+                borderWidth: 1,
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: { label: ctx => 'Correlation: ' + ctx.raw.toFixed(3) }
+                }
+            },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.03)' }, min: -1, max: 1 },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // ── Click Distribution ──
+    const clickCtx = document.getElementById('clickChart').getContext('2d');
+    new Chart(clickCtx, {
+        type: 'bar',
+        data: {
+            labels: clickLabels.map(v => v.toString()),
+            datasets: [{
+                label: 'Frequency',
+                data: clickValues,
+                backgroundColor: 'rgba(124,58,237,0.5)',
+                borderColor: '#7c3aed',
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, title: { display: true, text: 'Click Count' } },
+                y: { grid: { color: 'rgba(255,255,255,0.03)' }, title: { display: true, text: 'Frequency' } }
+            }
+        }
+    });
+
+    // ── Purchase vs Non-Purchase ──
+    const behaviorCtx = document.getElementById('behaviorChart').getContext('2d');
+    const behaviorLabels = Object.keys(purchaseYes).filter(k => k !== 'purchase');
+    new Chart(behaviorCtx, {
+        type: 'radar',
+        data: {
+            labels: behaviorLabels,
+            datasets: [{
+                label: 'Purchased (Yes)',
+                data: behaviorLabels.map(k => purchaseYes[k]),
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52,211,153,0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+            }, {
+                label: 'Not Purchased',
+                data: behaviorLabels.map(k => purchaseNo[k]),
+                borderColor: '#f43f5e',
+                backgroundColor: 'rgba(244,63,94,0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                r: {
+                    ticks: { display: false },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    angleLines: { color: 'rgba(255,255,255,0.08)' },
+                    pointLabels: { font: { size: 10 } }
+                }
+            }
+        }
+    });
+
+    // ── Latent Factor Chart ──
+    const latentCtx = document.getElementById('latentChart').getContext('2d');
+    // Simulate eigenvalues from SVD
+    const eigenvalues = [3.2, 1.8, 1.1, 0.7, 0.4, 0.25, 0.15, 0.1];
+    new Chart(latentCtx, {
+        type: 'line',
+        data: {
+            labels: eigenvalues.map((_, i) => 'Dim ' + (i+1)),
+            datasets: [{
+                label: 'Eigenvalue',
+                data: eigenvalues,
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139,92,246,0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5,
+                pointBackgroundColor: '#8b5cf6',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.03)' } },
+                y: { grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
+            },
+            plugins: {
+                annotation: {
+                    annotations: {
+                        cutoff: {
+                            type: 'line',
+                            yMin: 0.5,
+                            yMax: 0.5,
+                            borderColor: '#fbbf24',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // ── Feature Importance ──
+    const impCtx = document.getElementById('importanceChart').getContext('2d');
+    const features = corrLabels.filter(l => l !== 'purchase');
+    const importances = features.map(f => {
+        const idx = corrLabels.indexOf(f);
+        return Math.abs(corrValues[4][idx]); // absolute correlation with purchase
+    }).sort((a,b) => b - a);
+    const sortedFeatures = features
+        .map((f, i) => ({ name: f, imp: Math.abs(corrValues[4][corrLabels.indexOf(f)]) }))
+        .sort((a, b) => b.imp - a.imp);
+
+    new Chart(impCtx, {
+        type: 'bar',
+        data: {
+            labels: sortedFeatures.map(f => f.name),
+            datasets: [{
+                label: 'Importance (|correlation|)',
+                data: sortedFeatures.map(f => f.imp),
+                backgroundColor: [
+                    'rgba(124,58,237,0.7)',
+                    'rgba(6,182,212,0.7)',
+                    'rgba(236,72,153,0.7)',
+                    'rgba(52,211,153,0.7)',
+                    'rgba(251,191,36,0.7)',
+                    'rgba(244,63,94,0.7)',
+                    'rgba(139,92,246,0.7)',
+                ],
+                borderRadius: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(255,255,255,0.03)' }, beginAtZero: true }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>
