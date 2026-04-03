@@ -4,268 +4,116 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About the Model — AdNeural</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #06060f;
+            --bg2: #0d0d1a;
+            --card: rgba(18,18,40,0.6);
+            --border: rgba(255,255,255,0.08);
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --muted: #64748b;
+            --emerald: #34d399;
+            --cyan: #06b6d4;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+        }
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Inter',-apple-system,sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            line-height:1.6;
+            min-height:100vh;
+        }
+        .blob { position:fixed; border-radius:50%; filter:blur(120px); opacity:0.06; pointer-events:none; z-index:0; }
+        .blob-1 { width:600px; height:600px; background:var(--purple); top:-200px; left:-200px; animation:drift 20s ease-in-out infinite alternate; }
+        @keyframes drift { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,-30px) scale(1.1)} 100%{transform:translate(-20px,20px) scale(0.95)} }
+
+        /* Navbar */
+        .nav { position:fixed; top:0; left:0; right:0; z-index:1000; padding:16px 40px; display:flex; align-items:center; justify-content:space-between; background:rgba(6,6,15,0.8); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); }
+        .nav-logo { display:flex; align-items:center; gap:12px; text-decoration:none; }
+        .nav-icon { width:40px; height:40px; background:linear-gradient(135deg,var(--purple),var(--cyan)); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+        .nav-name { font-family:'Outfit',sans-serif; font-size:1.2rem; font-weight:700; background:linear-gradient(135deg,var(--purple),var(--cyan),var(--pink)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        .nav-links { display:flex; gap:8px; list-style:none; }
+        .nav-links a { padding:8px 18px; border-radius:99px; font-size:0.9rem; font-weight:500; color:var(--text2); transition:0.3s; text-decoration:none; }
+        .nav-links a:hover { color:#fff; background:rgba(255,255,255,0.06); }
+        .nav-links a.active { color:#fff; background:rgba(139,92,246,0.2); border:1px solid rgba(139,92,246,0.3); }
+
+        .content { position:relative; z-index:1; padding:140px 40px 80px; max-width:900px; margin:0 auto; }
+        .badge { display:inline-flex; align-items:center; gap:8px; padding:6px 18px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.25); border-radius:99px; font-size:0.75rem; font-weight:700; color:var(--purple); margin-bottom:24px; text-transform:uppercase; letter-spacing:1.5px; }
+        h1 { font-family:'Outfit',sans-serif; font-size:clamp(2rem,5vw,3rem); font-weight:900; margin-bottom:24px; }
+        p { margin-bottom:20px; color:var(--text2); font-size:1.05rem; }
+
+        .card { background:var(--card); border:1px solid var(--border); border-radius:24px; padding:32px; backdrop-filter:blur(10px); margin-bottom:32px; }
+        .card-title { font-family:'Outfit',sans-serif; font-size:1.24rem; font-weight:700; margin-bottom:24px; display:flex; align-items:center; gap:12px; }
+        .meta-list { list-style:none; }
+        .meta-item { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.03); font-size:0.95rem; }
+        .meta-label { color:var(--muted); font-weight:500; }
+        .meta-value { color:#fff; font-weight:600; font-family:'JetBrains Mono',monospace; }
+
+        .footer { text-align:center; padding:40px; border-top:1px solid var(--border); color:var(--muted); font-size:0.82rem; position:relative; z-index:1; }
+    </style>
 </head>
 <body>
 
-<!-- ═══ PARTICLES ═══ -->
-<div class="particles-container" id="particles"></div>
-<div class="glow-blob glow-blob-1"></div>
-<div class="glow-blob glow-blob-2"></div>
+<div class="blob blob-1"></div>
 
-<!-- ═══ NAVBAR ═══ -->
-<nav class="navbar" id="navbar">
-    <a href="/" class="nav-logo" style="text-decoration:none;">
-        <div class="nav-logo-icon">🧠</div>
-        <span class="nav-logo-text">AdNeural</span>
+<nav class="nav">
+    <a href="/" class="nav-logo">
+        <div class="nav-icon">🧠</div>
+        <span class="nav-name">AdNeural</span>
     </a>
     <ul class="nav-links">
-        <li><a href="/" class="nav-link">Home</a></li>
-        <li><a href="/analytics" class="nav-link">Analytics</a></li>
-        <li><a href="/about" class="nav-link active">About Model</a></li>
+        <li><a href="/">Home</a></li>
+        <li><a href="/analytics">Analytics</a></li>
+        <li><a href="/about" class="active">About</a></li>
     </ul>
 </nav>
 
-<!-- ═══ CONTENT ═══ -->
-<div class="about-content">
-    <div style="text-align:center; margin-bottom:48px; animation: fade-in-up 0.6s ease-out;">
-        <div class="hero-badge" style="margin-bottom:20px;">
-            <span class="dot"></span>
-            Research Paper Implementation
-        </div>
-        <h1 style="font-size:clamp(1.8rem,4vw,2.8rem); margin-bottom:12px;">
-            <span class="gradient-text">About the Model</span>
-        </h1>
-        <p style="color:var(--text-secondary); max-width:600px; margin:0 auto;">
-            Understanding the Correlation-Constrained Latent Factor approach to implicit feedback recommendation.
-        </p>
-    </div>
-
-    <div class="about-section" style="animation-delay:0.1s;">
-        <h2>📄 Research Title</h2>
-        <p style="font-size:1.1rem; color:var(--text-primary); font-weight:600; line-height:1.6;">
-            Correlation-Constrained Latent Factor Models for Implicit Feedback Recommendation Systems
-        </p>
-        <p>
-            This project implements a novel approach to ad recommendation that combines <strong>matrix factorization</strong>
-            of user-item implicit interactions with <strong>correlation-constrained regularization</strong> of the latent factor space.
-            Unlike explicit feedback systems (star ratings), our model learns from implicit behavioral signals —
-            clicks, view time, scroll depth, cart additions, and purchase events — using confidence-weighted
-            factorization inspired by <em>Hu, Koren & Volinsky (2008)</em>.
-        </p>
-    </div>
-
-    <!-- ═══ LIVE MODEL STATS ═══ -->
-    <div class="about-section" style="animation-delay:0.15s;">
-        <h2>📊 Trained Model Statistics</h2>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:16px;">
-            <div style="background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--purple-400);">{{ model_meta.n_users }}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Users</div>
+<div class="content">
+    <div class="badge">Model Architecture</div>
+    <h1>Real-Time Behavioral Purchase Predictor</h1>
+    <p>AdNeural v3.0 has shifted from static dataset analysis to a 100% real-time behavioral monitoring engine. Every interaction is evaluated within its local context to provide high-precision purchase intent scores.</p>
+    
+    <div class="card">
+        <div class="card-title">📦 Model Metadata</div>
+        <div class="meta-list">
+            <div class="meta-item">
+                <span class="meta-label">Engine Type</span>
+                <span class="meta-value">{{ model_meta.type }}</span>
             </div>
-            <div style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--cyan-400);">{{ model_meta.n_items }}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Items Observed</div>
+            <div class="meta-item">
+                <span class="meta-label">Primary Signals</span>
+                <span class="meta-value">{{ model_meta.signals | join(', ') }}</span>
             </div>
-            <div style="background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--emerald-400);">{{ model_meta.sparsity }}%</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Matrix Sparsity</div>
+            <div class="meta-item">
+                <span class="meta-label">Data Persistence</span>
+                <span class="meta-value">{{ model_meta.storage }}</span>
             </div>
-            <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--amber-400);">{{ model_meta.explained_variance }}%</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Explained Variance</div>
+            <div class="meta-item">
+                <span class="meta-label">Capture Methodology</span>
+                <span class="meta-value">Cross-Site Local Injection</span>
             </div>
-            <div style="background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--rose-500);">{{ model_meta.k_latent }}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Latent Dimensions</div>
-            </div>
-            <div style="background:rgba(236,72,153,0.1); border:1px solid rgba(236,72,153,0.2);
-                        border-radius:12px; padding:18px; text-align:center;">
-                <div style="font-size:1.6rem; font-weight:800; color:var(--pink-500);">{{ model_meta.lambda_corr }}</div>
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Correlation &lambda;</div>
+            <div class="meta-item">
+                <span class="meta-label">Live Sync Status</span>
+                <span class="meta-value" style="color:var(--emerald);">ACTIVE</span>
             </div>
         </div>
     </div>
 
-    <div class="about-section" style="animation-delay:0.2s;">
-        <h2>🧬 How It Works — The CCLF Pipeline</h2>
-        <p>Our system follows a rigorous multi-stage pipeline:</p>
-        <ul>
-            <li><strong>Step 1 — Implicit Feedback Collection:</strong> We collect behavioral signals from
-            <code>data.csv</code>: click counts, view time, scroll depth, add-to-cart events, purchase events,
-            search queries, and session duration. These are <em>implicit</em> signals — the user never
-            explicitly rates anything.</li>
-
-            <li><strong>Step 2 — Confidence-Weighted Interaction Matrix:</strong> For each user-item pair,
-            we compute a weighted implicit signal: <code>r<sub>ui</sub> = &sum; w<sub>k</sub> &middot; x<sub>k</sub></code>,
-            then derive a confidence level <code>c<sub>ui</sub> = 1 + &alpha; &middot; r<sub>ui</sub></code>
-            (with &alpha;={{ model_meta.alpha_confidence }}). Higher confidence means the system is more certain about the user's preference.</li>
-
-            <li><strong>Step 3 — Truncated SVD Factorization:</strong> We factorize the confidence-weighted
-            user-item matrix (<code>{{ model_meta.n_users }} &times; {{ model_meta.n_items }}</code>) via truncated SVD to extract
-            <code>k={{ model_meta.k_latent }}</code> latent factors, capturing <strong>{{ model_meta.explained_variance }}%</strong>
-            of total variance. This gives us user factors <code>P</code> and item factors <code>Q</code>.</li>
-
-            <li><strong>Step 4 — Correlation Constraint:</strong> We compute the Pearson correlation matrix
-            across all 8 behavioral features, then extract its top eigenvectors via SVD. Item factors are
-            adjusted: <code>Q<sub>adj</sub> = (1-&lambda;)Q + &lambda; &middot; corr_projection</code>,
-            constraining representations to respect behavioral correlations (e.g., the strong
-            <code>add_to_cart ↔ purchase</code> correlation of r=0.57).</li>
-
-            <li><strong>Step 5 — Recommendation Scoring:</strong> For each user-product pair, we compute
-            <code>score = P<sub>u</sub> &middot; Q<sub>adj,i</sub></code> — a dot product in the
-            correlation-constrained latent space. Products are ranked by this score.</li>
-        </ul>
-    </div>
-
-    <div class="about-section" style="animation-delay:0.3s;">
-        <h2>📐 Mathematical Formulation</h2>
-        <p>The core mathematical framework of the CCLF model:</p>
-
-        <div class="formula-block">
-            r<sub>ui</sub> = &sum;<sub>k</sub> w<sub>k</sub> &middot; x<sub>ui,k</sub>  — Weighted Implicit Signal
-        </div>
-
-        <div class="formula-block">
-            c<sub>ui</sub> = 1 + &alpha; &middot; r<sub>ui</sub>  — Confidence Level (&alpha;={{ model_meta.alpha_confidence }})
-        </div>
-
-        <div class="formula-block">
-            R&#x0303; = &radic;C &odot; R &approx; U&Sigma;V<sup>T</sup>  — Truncated SVD (k={{ model_meta.k_latent }})
-        </div>
-
-        <div class="formula-block">
-            &Omega; = X<sup>T</sup>X / (n-1), &nbsp; &Omega; = U<sub>&Omega;</sub>&Sigma;<sub>&Omega;</sub>V<sub>&Omega;</sub><sup>T</sup>  — Correlation Basis
-        </div>
-
-        <div class="formula-block">
-            Q<sub>adj</sub> = (1-&lambda;)Q&#x0302; + &lambda; &middot; (behavioral &middot; U<sub>&Omega;</sub><sup>[:k]</sup>)  — Correlation Constraint
-        </div>
-
-        <div class="formula-block">
-            score(u, i) = P<sub>u</sub> &middot; Q<sub>adj,i</sub><sup>T</sup>  — Latent Space Dot Product
-        </div>
-
-        <p>
-            Where <code>&lambda;={{ model_meta.lambda_corr }}</code> controls the strength of the correlation
-            constraint. Higher &lambda; forces item representations to align more strongly with the behavioral
-            correlation structure.
-        </p>
-    </div>
-
-    <div class="about-section" style="animation-delay:0.35s;">
-        <h2>🔗 The "Correlation Constraint" — Why It Matters</h2>
-        <p>
-            Standard matrix factorization (SVD) decomposes the user-item interaction matrix to find latent
-            factors, but treats each behavioral signal independently. The <strong>correlation constraint</strong>
-            adds a crucial regularization:
-        </p>
-        <p>
-            By projecting item factors through the <strong>eigenvectors of the behavioral correlation matrix</strong>,
-            we ensure that latent representations encode known relationships between user behaviors.
-            For example, in our data:
-        </p>
-        <ul style="margin-top:10px;">
-            <li><code>add_to_cart</code> and <code>purchase</code> have <strong>r = 0.569</strong> — items
-            attractive to "cart-adders" should also appeal to "purchasers"</li>
-            <li><code>click_count</code> and <code>session_duration</code> are moderately correlated —
-            engaged clickers tend to have longer sessions</li>
-            <li><code>scroll_depth</code> and <code>purchase</code> are <strong>negatively</strong> correlated
-            (r = -0.085) — deep scrollers may be "browsing" rather than buying</li>
-        </ul>
-        <p style="margin-top:12px;">
-            Without the correlation constraint, the model might learn item factors that ignore these
-            behavioral relationships. With it, recommendations are more <em>behaviorally coherent</em>.
-        </p>
-    </div>
-
-    <div class="about-section" style="animation-delay:0.4s;">
-        <h2>📊 Implicit Feedback Features & Weights</h2>
-        <p>Our model uses the following implicit feedback signals with their contribution weights:</p>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:16px;">
-            <div style="background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--purple-400);">purchase</strong>
-                <span style="float:right; color:var(--emerald-400); font-weight:700;">w = 5.0</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Strongest signal — completed purchase</p>
-            </div>
-            <div style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--cyan-400);">add_to_cart</strong>
-                <span style="float:right; color:var(--emerald-400); font-weight:700;">w = 3.0</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Strong purchase intent signal</p>
-            </div>
-            <div style="background:rgba(236,72,153,0.1); border:1px solid rgba(236,72,153,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--pink-500);">click_count</strong>
-                <span style="float:right; color:var(--amber-400); font-weight:700;">w = 1.0</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Moderate interest (per click)</p>
-            </div>
-            <div style="background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--emerald-400);">search_query_count</strong>
-                <span style="float:right; color:var(--amber-400); font-weight:700;">w = 0.5</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Active search behavior</p>
-            </div>
-            <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--amber-400);">scroll_depth</strong>
-                <span style="float:right; color:var(--text-muted); font-weight:700;">w = 0.02</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Exploration depth (normalized %)</p>
-            </div>
-            <div style="background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.2); border-radius:8px; padding:14px;">
-                <strong style="color:var(--rose-500);">view_time_sec</strong>
-                <span style="float:right; color:var(--text-muted); font-weight:700;">w = 0.01</span>
-                <p style="font-size:0.82rem; margin:4px 0 0;">Dwell time (normalized seconds)</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="about-section" style="animation-delay:0.5s;">
-        <h2>🛠️ Technology Stack</h2>
-        <ul>
-            <li><strong>Backend:</strong> Flask (Python) with NumPy, Pandas, SciPy</li>
-            <li><strong>ML Model:</strong> Truncated SVD (scipy.sparse.linalg) + Correlation-Constrained Regularization</li>
-            <li><strong>Purchase Prediction:</strong> XGBoost/AdaBoost ensemble classifier (model.pkl)</li>
-            <li><strong>Frontend:</strong> Vanilla HTML/CSS/JavaScript with Chart.js</li>
-            <li><strong>Data:</strong> {{ model_meta.n_interactions }} implicit user-item interactions (<code>data.csv</code>)</li>
-            <li><strong>Live Rates:</strong> Frankfurter API (European Central Bank exchange rates)</li>
-            <li><strong>Design:</strong> Glassmorphism, CSS animations, particle effects</li>
-        </ul>
-    </div>
-
-    <div style="text-align:center; margin-top:40px; animation: fade-in-up 0.6s ease-out 0.6s both;">
-        <a href="/" class="btn-secondary">← Back to Home</a>
-        <a href="/analytics" class="btn-secondary" style="margin-left:12px;">📊 View Analytics</a>
+    <div class="card">
+        <div class="card-title">🧠 Prediction Methodology</div>
+        <p>The core logic uses a weighted heuristic algorithm that favors recurring interest. A single visit is treated as exploration, while multiple visits within a short time window significantly boost the "Purchase Probability" score.</p>
+        <p style="margin-bottom:0;">Privacy is central: No browsing data ever leaves your local machine. All processing and analysis happen within the Flask environment running on 127.0.0.1.</p>
     </div>
 </div>
 
-<!-- ═══ FOOTER ═══ -->
 <footer class="footer">
-    <p class="footer-text">
-        Built with <span class="heart">♥</span> using Correlation-Constrained Latent Factor Models — © 2026
-    </p>
+    <p>© 2026 AdNeural Real-Time Logic Engine</p>
 </footer>
-
-<script>
-// ═══ PARTICLES ═══
-const pc = document.getElementById('particles');
-for (let i = 0; i < 25; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.style.left=Math.random()*100+'%';
-    p.style.animationDuration=(Math.random()*15+10)+'s';
-    p.style.animationDelay=(Math.random()*15)+'s';
-    p.style.width=p.style.height=(Math.random()*3+1)+'px';
-    pc.appendChild(p);
-}
-
-// ═══ NAVBAR ═══
-window.addEventListener('scroll', () => {
-    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
-});
-</script>
 
 </body>
 </html>
