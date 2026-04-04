@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About the Model — AdNeural</title>
+    <title>CCLF Model Architecture — AdNeural</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -19,6 +19,7 @@
             --cyan: #06b6d4;
             --purple: #8b5cf6;
             --pink: #ec4899;
+            --amber: #fbbf24;
         }
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -30,6 +31,7 @@
         }
         .blob { position:fixed; border-radius:50%; filter:blur(120px); opacity:0.06; pointer-events:none; z-index:0; }
         .blob-1 { width:600px; height:600px; background:var(--purple); top:-200px; left:-200px; animation:drift 20s ease-in-out infinite alternate; }
+        .blob-2 { width:400px; height:400px; background:var(--cyan); bottom:-100px; right:-100px; animation:drift 25s ease-in-out infinite alternate-reverse; }
         @keyframes drift { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,-30px) scale(1.1)} 100%{transform:translate(-20px,20px) scale(0.95)} }
 
         /* Navbar */
@@ -45,6 +47,7 @@
         .content { position:relative; z-index:1; padding:140px 40px 80px; max-width:900px; margin:0 auto; }
         .badge { display:inline-flex; align-items:center; gap:8px; padding:6px 18px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.25); border-radius:99px; font-size:0.75rem; font-weight:700; color:var(--purple); margin-bottom:24px; text-transform:uppercase; letter-spacing:1.5px; }
         h1 { font-family:'Outfit',sans-serif; font-size:clamp(2rem,5vw,3rem); font-weight:900; margin-bottom:24px; }
+        h1 span { background:linear-gradient(135deg,var(--emerald),var(--cyan),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
         p { margin-bottom:20px; color:var(--text2); font-size:1.05rem; }
 
         .card { background:var(--card); border:1px solid var(--border); border-radius:24px; padding:32px; backdrop-filter:blur(10px); margin-bottom:32px; }
@@ -54,12 +57,46 @@
         .meta-label { color:var(--muted); font-weight:500; }
         .meta-value { color:#fff; font-weight:600; font-family:'JetBrains Mono',monospace; }
 
+        /* Math block */
+        .math-block { background:rgba(0,0,0,0.3); border:1px solid rgba(139,92,246,0.15); border-radius:14px; padding:20px 24px; margin:16px 0; font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:var(--cyan); line-height:1.8; overflow-x:auto; }
+        .math-block .comment { color:var(--muted); }
+        .math-block .highlight { color:var(--emerald); font-weight:700; }
+        .math-block .var { color:var(--purple); font-style:italic; }
+
+        /* Feature grid */
+        .feature-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin:20px 0; }
+        .feature-chip { background:rgba(139,92,246,0.06); border:1px solid rgba(139,92,246,0.15); border-radius:12px; padding:14px 16px; text-align:center; transition:0.3s; }
+        .feature-chip:hover { border-color:rgba(139,92,246,0.4); transform:translateY(-2px); }
+        .feature-name { font-size:0.78rem; font-weight:700; color:var(--purple); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:4px; }
+        .feature-desc { font-size:0.72rem; color:var(--text2); }
+
+        /* Pipeline steps */
+        .pipeline { display:flex; flex-direction:column; gap:16px; margin:20px 0; }
+        .pipeline-step { display:flex; gap:16px; align-items:flex-start; }
+        .pipeline-num { width:36px; height:36px; background:linear-gradient(135deg,var(--purple),var(--cyan)); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; flex-shrink:0; }
+        .pipeline-content { flex:1; }
+        .pipeline-title { font-weight:700; font-size:0.95rem; margin-bottom:4px; }
+        .pipeline-desc { font-size:0.85rem; color:var(--text2); }
+
+        /* Live stats bar */
+        .live-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:20px 0; }
+        .live-stat { background:rgba(52,211,153,0.06); border:1px solid rgba(52,211,153,0.12); border-radius:12px; padding:16px; text-align:center; }
+        .live-stat-val { font-family:'Outfit',sans-serif; font-size:1.4rem; font-weight:800; color:var(--emerald); }
+        .live-stat-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+
         .footer { text-align:center; padding:40px; border-top:1px solid var(--border); color:var(--muted); font-size:0.82rem; position:relative; z-index:1; }
+
+        @media (max-width:768px) {
+            .content { padding:120px 20px 60px; }
+            .nav { padding:12px 16px; }
+            .feature-grid { grid-template-columns:repeat(2,1fr); }
+        }
     </style>
 </head>
 <body>
 
 <div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
 
 <nav class="nav">
     <a href="/" class="nav-logo">
@@ -74,10 +111,31 @@
 </nav>
 
 <div class="content">
-    <div class="badge">Model Architecture</div>
-    <h1>Real-Time Behavioral Purchase Predictor</h1>
-    <p>AdNeural v3.0 has shifted from static dataset analysis to a 100% real-time behavioral monitoring engine. Every interaction is evaluated within its local context to provide high-precision purchase intent scores.</p>
+    <div class="badge">🧬 Model Architecture</div>
+    <h1>Correlation-Constrained <span>Latent Factor Model</span></h1>
+    <p>AdNeural v4.0 uses a mathematically grounded CCLF model that extracts latent behavioral patterns from real-time browsing data. Instead of simple heuristics, every prediction is powered by SVD decomposition, Pearson correlation analysis, and sigmoid-calibrated probability estimation.</p>
     
+    <!-- Live Model Stats -->
+    <div class="live-bar">
+        <div class="live-stat">
+            <div class="live-stat-val">{{ model_meta.n_products }}</div>
+            <div class="live-stat-label">Products Tracked</div>
+        </div>
+        <div class="live-stat">
+            <div class="live-stat-val">k={{ model_meta.k_latent }}</div>
+            <div class="live-stat-label">Latent Factors</div>
+        </div>
+        <div class="live-stat">
+            <div class="live-stat-val">{{ model_meta.explained_variance }}%</div>
+            <div class="live-stat-label">Explained Variance</div>
+        </div>
+        <div class="live-stat">
+            <div class="live-stat-val">8</div>
+            <div class="live-stat-label">Feature Dimensions</div>
+        </div>
+    </div>
+
+    <!-- Model Metadata -->
     <div class="card">
         <div class="card-title">📦 Model Metadata</div>
         <div class="meta-list">
@@ -86,8 +144,12 @@
                 <span class="meta-value">{{ model_meta.type }}</span>
             </div>
             <div class="meta-item">
-                <span class="meta-label">Primary Signals</span>
-                <span class="meta-value">{{ model_meta.signals | join(', ') }}</span>
+                <span class="meta-label">Latent Dimensions</span>
+                <span class="meta-value">k = {{ model_meta.k_latent }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Feature Dimensions</span>
+                <span class="meta-value">d = 8</span>
             </div>
             <div class="meta-item">
                 <span class="meta-label">Data Persistence</span>
@@ -104,15 +166,150 @@
         </div>
     </div>
 
+    <!-- Mathematical Formulation -->
     <div class="card">
-        <div class="card-title">🧠 Prediction Methodology</div>
-        <p>The core logic uses a weighted heuristic algorithm that favors recurring interest. A single visit is treated as exploration, while multiple visits within a short time window significantly boost the "Purchase Probability" score.</p>
-        <p style="margin-bottom:0;">Privacy is central: No browsing data ever leaves your local machine. All processing and analysis happen within the Flask environment running on 127.0.0.1.</p>
+        <div class="card-title">📐 Mathematical Formulation</div>
+        <p>The TA-CCLF model factorizes the correlation-constrained behavioral matrix into low-rank latent factors using Singular Value Decomposition, upgraded with Tikhonov Regularization and Hu-Koren-Volinsky Implicit Confidence Weighting.</p>
+        
+        <div class="math-block">
+            <span class="comment">// Step 1: Feature extraction</span><br>
+            <span class="var">x<sub>i</sub></span> = [view_count, session_dur, price, recency, velocity, cart, cat_affinity, rel_interest] ∈ <span class="highlight">ℝ<sup>8</sup></span><br><br>
+            
+            <span class="comment">// Step 2: Time-Decayed Correlation Matrix (Ebbinghaus) & Tikhonov Regularization</span><br>
+            <span class="var">W</span> = diag(e<sup>-t / λ<sub>decay</sub></sup>)  <span class="comment">(exponential time decay for novelty scaling)</span><br>
+            <span class="var">C<sub>reg</sub></span> = <span class="var">X̃<sup>T</sup></span> · <span class="var">W</span> · <span class="var">X̃</span> / (n - 1) + <span class="highlight">λI</span>  where <span class="var">X̃</span> = normalized(<span class="var">X</span>)<br><br>
+            
+            <span class="comment">// Step 3: SVD decomposition</span><br>
+            <span class="var">C<sub>reg</sub></span> = <span class="var">U</span> · <span class="var">Σ</span> · <span class="var">V<sup>T</sup></span><br>
+            Truncate to k=<span class="highlight">{{ model_meta.k_latent }}</span> latent factors<br><br>
+            
+            <span class="comment">// Step 4: Latent space projection (Hu, Koren, Volinsky Confidence)</span><br>
+            <span class="var">c<sub>ui</sub></span> = 1 + α(log(1 + views)) + β(cart) + γ(affinity)<br>
+            <span class="var">q<sub>i</sub></span> = <span class="var">U<sub>k</sub><sup>T</sup></span> · <span class="var">x<sub>i</sub></span>  <span class="comment">(item latent)</span><br>
+            <span class="var">p<sub>u</sub></span> = Σ (<span class="var">c<sub>uj</sub></span> · <span class="var">U<sub>k</sub><sup>T</sup></span> · <span class="var">x<sub>j</sub></span>) / Σ <span class="var">c<sub>uj</sub></span>  <span class="comment">(user latent, implicitly weighted)</span><br><br>
+            
+            <span class="comment">// Step 5: Correlation constraint</span><br>
+            <span class="var">w<sub>k</sub></span> = 1 / √<span class="var">σ<sub>k</sub></span>  <span class="comment">(penalize redundant correlated features)</span><br><br>
+            
+            <span class="comment">// Step 6: Score computation</span><br>
+            <span class="var">s</span> = Σ<sub>k</sub> <span class="var">p<sub>u,k</sub></span> · <span class="var">σ<sub>k</sub></span> · <span class="var">q<sub>i,k</sub></span> · <span class="var">w<sub>k</sub></span><br><br>
+            
+            <span class="comment">// Step 7: Platt Scaling Probability Calibration</span><br>
+            P(y=1) = <span class="highlight">σ</span>((s - μ) / τ)  <span class="comment">(temperature-calibrated logistic function)</span>
+        </div>
+    </div>
+
+    <!-- Feature Descriptions -->
+    <div class="card">
+        <div class="card-title">🔬 Behavioral Feature Vector (8D)</div>
+        <p>Each product interaction is represented as an 8-dimensional feature vector capturing different aspects of browsing behavior.</p>
+        
+        <div class="feature-grid">
+            <div class="feature-chip">
+                <div class="feature-name">f₁ View Count</div>
+                <div class="feature-desc">Log-scaled page loads</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₂ Session Duration</div>
+                <div class="feature-desc">Total time browsing</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₃ Price Signal</div>
+                <div class="feature-desc">Inverse price sensitivity</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₄ Recency</div>
+                <div class="feature-desc">Exponential time decay</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₅ View Velocity</div>
+                <div class="feature-desc">Views per minute</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₆ Cart Signal</div>
+                <div class="feature-desc">Add-to-cart intent</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₇ Category Affinity</div>
+                <div class="feature-desc">Same-category interest</div>
+            </div>
+            <div class="feature-chip">
+                <div class="feature-name">f₈ Relative Interest</div>
+                <div class="feature-desc">Views vs. average</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prediction Pipeline -->
+    <div class="card">
+        <div class="card-title">⚡ Real-Time Prediction Pipeline</div>
+        <div class="pipeline">
+            <div class="pipeline-step">
+                <div class="pipeline-num">1</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">Extension Captures</div>
+                    <div class="pipeline-desc">Browser extension detects Amazon product pages and sends product name, price, and URL to the local Flask server. Every page load is tracked — revisits increment the view count.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">2</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">Feature Extraction</div>
+                    <div class="pipeline-desc">8 behavioral features are extracted from the session: view count, duration, price, recency, velocity, cart status, category affinity, and relative interest.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">3</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">Correlation Matrix</div>
+                    <div class="pipeline-desc">A Pearson correlation matrix is computed across all tracked products to identify which features provide independent signal vs. redundant information.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">4</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">SVD Decomposition</div>
+                    <div class="pipeline-desc">The correlation matrix is decomposed via SVD into k={{ model_meta.k_latent }} latent factors. These capture the dominant patterns of correlated behavior.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">5</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">Constrained Scoring</div>
+                    <div class="pipeline-desc">User and item latent vectors are computed, then a correlation-constrained dot product produces the raw prediction score. Redundant features are penalized.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num">6</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title">Sigmoid Calibration</div>
+                    <div class="pipeline-desc">The raw score is passed through a calibrated sigmoid function to produce a purchase probability between 0% and 100%, with realistic bounds.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Why Correlation Constraints? -->
+    <div class="card">
+        <div class="card-title">🎯 Why Correlation Constraints?</div>
+        <p>In standard latent factor models, highly correlated features (e.g., view count and session duration) can dominate predictions, leading to redundant signals and lower accuracy.</p>
+        <p>The <strong>correlation constraint</strong> applies an inverse-sqrt weighting from the SVD singular values. This means:</p>
+        <div style="margin:16px 0; padding-left:20px; border-left:3px solid var(--purple);">
+            <p style="margin-bottom:8px;"><strong style="color:var(--emerald);">Independent features</strong> (low correlation with others) receive <strong>higher weight</strong> — they provide unique signal.</p>
+            <p style="margin-bottom:0;"><strong style="color:var(--amber);">Redundant features</strong> (high correlation with others) receive <strong>lower weight</strong> — the model deduplicates the signal automatically.</p>
+        </div>
+        <p style="margin-top:16px;">This constraint is especially powerful for this use case because behavioral signals like "view count" and "view velocity" are naturally correlated — CCLF ensures the model doesn't double-count them.</p>
+    </div>
+
+    <!-- Privacy -->
+    <div class="card">
+        <div class="card-title">🔒 Privacy Architecture</div>
+        <p style="margin-bottom:0;">All data stays on your local machine. The extension communicates exclusively with your local Flask server at <code style="color:var(--cyan); background:rgba(6,182,212,0.1); padding:2px 8px; border-radius:4px;">127.0.0.1:5000</code>. No browsing data ever leaves your computer. All SVD computation, correlation analysis, and prediction happen locally in real-time.</p>
     </div>
 </div>
 
 <footer class="footer">
-    <p>© 2026 AdNeural Real-Time Logic Engine</p>
+    <p>© 2026 AdNeural — Correlation-Constrained Latent Factor Model v4.0</p>
 </footer>
 
 </body>

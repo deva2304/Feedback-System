@@ -1,13 +1,16 @@
-// Amazon Safe Tracker v3 - content.js
-// Optimized for reliable product detection and communication via Service Worker
+// Amazon Safe Tracker v4 - content.js
+// Enhanced: Always tracks page loads (for view count), detects Add to Cart events
 
-console.log("[Amazon-Tracker] ✅ Reality Tracking Loaded on:", window.location.hostname);
+console.log("[Amazon-Tracker] ✅ CCLF Tracker Loaded on:", window.location.hostname);
 
-let lastTrackedURL = "";
+// Track how many times we've sent for THIS page load (prevent re-sends within same load)
+let hasSentThisPageLoad = false;
+let hasDetectedCart = false;
+let currentProduct = { name: "Unknown", price: "N/A", url: "" };
 
 function captureProduct() {
     if (!window.location.href.includes('/dp/')) return;
-    if (window.location.href === lastTrackedURL) return;
+    if (hasSentThisPageLoad) return; // Only prevent within the SAME page load, not across navigations
 
     // Direct selectors + aria-label for better coverage
     const titleEl = 
@@ -25,9 +28,10 @@ function captureProduct() {
         const price = priceEl ? priceEl.innerText.trim() : "N/A";
         
         console.log("[Amazon-Tracker] 🎯 Product Found:", productName);
-        lastTrackedURL = window.location.href;
+        hasSentThisPageLoad = true;
+        currentProduct = { name: productName, price: price, url: window.location.href };
 
-        // Send to background service worker (safer than direct fetch)
+        // Send to background service worker
         chrome.runtime.sendMessage({
             type: "TRACK_PRODUCT",
             data: {
@@ -37,9 +41,49 @@ function captureProduct() {
                 timestamp: new Date().toISOString()
             }
         });
+
+        // Set up Add to Cart detection AFTER product is captured
+        setupCartDetection();
     } else {
         console.log("[Amazon-Tracker] ⏳ Still searching for product title...");
     }
+}
+
+function setupCartDetection() {
+    if (hasDetectedCart) return;
+    hasDetectedCart = true;
+
+    // Use event delegation on the document body to catch clicks even if buttons load late
+    document.body.addEventListener('click', (e) => {
+        const target = e.target;
+        
+        // Amazon uses various selectors for cart/buy buttons depending on category/layout
+        const isCartBtn = target.closest('#add-to-cart-button') || 
+                          target.closest('input[name="submit.add-to-cart"]') || 
+                          target.closest('[id^="add-to-cart-button"]') ||
+                          target.closest('.a-button-input[aria-labelledby*="add-to-cart"]');
+                          
+        const isBuyNowBtn = target.closest('#buy-now-button') || 
+                            target.closest('input[name="submit.buy-now"]');
+
+        if (isCartBtn || isBuyNowBtn) {
+            const eventType = isBuyNowBtn ? "buy_now" : "add_to_cart";
+            console.log(`[Amazon-Tracker] 🛒 ${eventType.toUpperCase()} detected for:`, currentProduct.name);
+            
+            chrome.runtime.sendMessage({
+                type: "ADD_TO_CART",
+                data: {
+                    product_name: currentProduct.name,
+                    price: currentProduct.price,
+                    url: currentProduct.url,
+                    event: eventType,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    });
+    
+    console.log("[Amazon-Tracker] 👀 Cart button delegate watcher active");
 }
 
 // Retries ensure we catch the late-loading DOM on Amazon
@@ -52,7 +96,9 @@ let lastURL = window.location.href;
 setInterval(() => {
     if (window.location.href !== lastURL) {
         lastURL = window.location.href;
-        lastTrackedURL = ""; 
+        // Reset for new page — allow tracking again
+        hasSentThisPageLoad = false;
+        hasDetectedCart = false;
         setTimeout(captureProduct, 2000);
     }
 }, 2000);

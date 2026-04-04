@@ -98,7 +98,7 @@
         .empty-title { font-size:1rem; font-weight:600; color:var(--text2); margin-bottom:6px; }
 
         /* Live card */
-        .lc { background:rgba(255,255,255,0.035); border:1px solid var(--border); border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:14px; transition:all .4s cubic-bezier(.4,0,.2,1); animation:lcIn .5s cubic-bezier(.34,1.56,.64,1); position:relative; overflow:hidden; }
+        .lc { background:rgba(255,255,255,0.035); border:1px solid var(--border); border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:14px; transition:all .4s cubic-bezier(.4,0,.2,1); animation:lcIn .5s cubic-bezier(.34,1.56,.64,1); position:relative; overflow:hidden; cursor:pointer; }
         .lc::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; background:linear-gradient(90deg,var(--emerald),var(--cyan),var(--purple)); opacity:0; transition:.3s; }
         .lc:hover { transform:translateY(-6px); border-color:rgba(52,211,153,0.3); box-shadow:0 16px 48px rgba(52,211,153,0.06); }
         .lc:hover::before { opacity:1; }
@@ -123,6 +123,21 @@
         /* Footer */
         .footer { text-align:center; padding:40px; border-top:1px solid var(--border); color:var(--muted); font-size:0.82rem; position:relative; z-index:1; }
         .footer a { color:var(--cyan); text-decoration:none; }
+
+        /* Category badge */
+        .lc-cat { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:8px; font-size:0.68rem; font-weight:700; background:rgba(139,92,246,0.1); color:var(--purple); border:1px solid rgba(139,92,246,0.2); text-transform:uppercase; letter-spacing:0.5px; }
+        .lc-cart-tag { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:800; background:rgba(52,211,153,0.12); color:var(--emerald); border:1px solid rgba(52,211,153,0.25); text-transform:uppercase; letter-spacing:0.8px; animation:cartPulse 2s ease infinite; }
+        @keyframes cartPulse { 0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,0.3)} 50%{box-shadow:0 0 0 6px rgba(52,211,153,0)} }
+        .lc-loads { font-size:0.68rem; color:var(--muted); display:flex; align-items:center; gap:4px; }
+        .lc-loads .count { color:var(--cyan); font-weight:700; font-family:'JetBrains Mono',monospace; }
+        .lc-meta-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+        /* Category filter pills */
+        .cat-filters { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:28px; }
+        .cat-pill { padding:6px 16px; border-radius:99px; font-size:0.78rem; font-weight:600; background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--text2); cursor:pointer; transition:all 0.3s ease; display:flex; align-items:center; gap:6px; }
+        .cat-pill:hover { background:rgba(139,92,246,0.1); border-color:rgba(139,92,246,0.3); color:var(--purple); }
+        .cat-pill.active { background:rgba(139,92,246,0.15); border-color:rgba(139,92,246,0.4); color:#fff; }
+        .cat-pill .cat-count { background:rgba(255,255,255,0.1); padding:1px 7px; border-radius:99px; font-size:0.65rem; font-family:'JetBrains Mono',monospace; }
 
         @media (max-width:768px) {
             .nav { padding:12px 20px; }
@@ -158,10 +173,10 @@
 <section class="hero">
     <div class="hero-badge">
         <span class="dot"></span>
-        Real-Time Purchase Prediction
+        Correlation-Constrained Latent Factors
     </div>
     <h1>Your AI <span>Purchase Predictor</span></h1>
-    <p>Browse Amazon with our extension installed — every product you view is captured and analyzed in real-time to predict your purchase probability.</p>
+    <p>Powered by a Correlation-Constrained Latent Factor Model — every product you view is captured and analyzed using SVD-decomposed behavioral features to predict purchase probability in real-time.</p>
 
     <div class="stats-row">
         <div class="stat-card">
@@ -179,6 +194,10 @@
         <div class="stat-card">
             <div class="stat-val am" id="statUnique">{{ unique_products }}</div>
             <div class="stat-lbl">Unique Items</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-val" style="color:var(--emerald);" id="statCart">0</div>
+            <div class="stat-lbl">Added to Cart</div>
         </div>
     </div>
 </section>
@@ -204,6 +223,11 @@
         </div>
     </div>
 
+    <!-- Category Filter Pills -->
+    <div class="cat-filters" id="catFilters">
+        <div class="cat-pill active" data-cat="all" onclick="filterCategory('all', this)">📊 All</div>
+    </div>
+
     <div class="live-grid" id="liveActivityFeed">
         <div class="empty-msg" id="emptyMsg">
             <div class="empty-icon">🛒</div>
@@ -216,30 +240,30 @@
 <!-- How It Works -->
 <section class="section">
     <div class="section-header">
-        <div class="section-label" style="color:var(--purple);">How It Works</div>
-        <h2 class="section-title">100% Real-Time AI Prediction</h2>
-        <p class="section-desc">No static datasets. Everything is captured from your live browsing activity.</p>
+        <div class="section-label" style="color:var(--purple);">CCLF Model Pipeline</div>
+        <h2 class="section-title">Correlation-Constrained Prediction</h2>
+        <p class="section-desc">Powered by SVD decomposition of behavioral correlation matrices — not simple heuristics.</p>
     </div>
     <div class="how-grid">
         <div class="how-card">
             <div class="how-icon">🔌</div>
             <div class="how-title">1. Extension Captures</div>
-            <div class="how-desc">The browser extension detects when you're on an Amazon product page and captures the product name and price.</div>
+            <div class="how-desc">Every product page load is tracked. Revisits increment the view count — a strong buying signal. Add-to-cart events are captured automatically.</div>
         </div>
         <div class="how-card">
-            <div class="how-icon">📡</div>
-            <div class="how-title">2. Data Sent Locally</div>
-            <div class="how-desc">All data stays on YOUR computer. It's sent to your local Flask server — never to the cloud.</div>
+            <div class="how-icon">🔬</div>
+            <div class="how-title">2. Feature Extraction</div>
+            <div class="how-desc">8 behavioral features are extracted: views, duration, price, recency, velocity, cart status, category affinity, and relative interest.</div>
+        </div>
+        <div class="how-card">
+            <div class="how-icon">📊</div>
+            <div class="how-title">3. Correlation Matrix</div>
+            <div class="how-desc">Pearson correlation matrix is built across all products, then decomposed via SVD into latent factors that capture behavioral patterns.</div>
         </div>
         <div class="how-card">
             <div class="how-icon">🧠</div>
-            <div class="how-title">3. AI Predicts</div>
-            <div class="how-desc">Our engine analyzes click frequency, session duration, price, and return visits to predict purchase probability.</div>
-        </div>
-        <div class="how-card">
-            <div class="how-icon">💾</div>
-            <div class="how-title">4. Stored Forever</div>
-            <div class="how-desc">Every interaction is saved to captured_data.csv — your personal browsing dataset grows over time.</div>
+            <div class="how-title">4. CCLF Prediction</div>
+            <div class="how-desc">Correlation-constrained dot product + sigmoid calibration produces a realistic purchase probability. More views & cart = higher score.</div>
         </div>
     </div>
 </section>
@@ -255,9 +279,105 @@
 // LIVE MONITORING ENGINE
 // ═══════════════════════════════════════════
 let _prev = -1;
+let _currentFilter = 'all';
+let _allData = [];
+
+function filterCategory(cat, el) {
+    _currentFilter = cat;
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    renderCards(_allData);
+}
+
+function renderCards(data) {
+    const feed = document.getElementById('liveActivityFeed');
+    const filtered = _currentFilter === 'all' ? data : data.filter(d => d.category === _currentFilter);
+
+    if (filtered.length === 0) {
+        feed.innerHTML = `<div class="empty-msg">
+            <div class="empty-icon">📭</div>
+            <div class="empty-title">${_currentFilter === 'all' ? 'No activity yet' : 'No products in ' + _currentFilter}</div>
+            <div>Browse products on Amazon to see predictions here.</div>
+        </div>`;
+        return;
+    }
+
+    // Sort by prediction descending to show most likely purchased at the top
+    filtered.sort((a, b) => parseFloat(b.prediction) - parseFloat(a.prediction));
+
+    feed.innerHTML = '';
+    filtered.forEach((item, index) => {
+        const t = item.timestamp ? new Date(item.timestamp * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : 'Just now';
+        const catIcon = item.category_icon || '📦';
+        const catName = item.category || 'Other';
+        const cartTag = item.added_to_cart ? `<span class="lc-cart-tag">🛒 In Cart</span>` : '';
+        const loads = item.page_loads || 1;
+        const viewBarWidth = Math.min(loads * 15, 100); // Visual bar: 15% per view, max 100%
+        const viewIntensity = loads >= 5 ? 'high' : loads >= 3 ? 'medium' : 'low';
+        
+        // Special badge for Top 3 most likely to be purchased
+        let topBadgeHTML = '';
+        if (index === 0) topBadgeHTML = `<span class="lc-badge" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#fff;">🥇 #1 Top Pick</span>`;
+        else if (index === 1) topBadgeHTML = `<span class="lc-badge" style="background:linear-gradient(135deg,#94a3b8,#cbd5e1);color:#0f172a;">🥈 #2 High Intent</span>`;
+        else if (index === 2) topBadgeHTML = `<span class="lc-badge" style="background:linear-gradient(135deg,#b45309,#d97706);color:#fff;">🥉 #3 Likely</span>`;
+        else topBadgeHTML = `<span class="lc-badge">Captured</span>`;
+        
+        const card = document.createElement('div');
+        card.className = 'lc';
+        card.onclick = () => window.open(item.url, '_blank');
+        card.innerHTML = `
+            <div class="lc-top">
+                ${topBadgeHTML}
+                <span class="lc-time">${t}</span>
+            </div>
+            <div class="lc-name">${item.product_name}</div>
+            <div class="lc-meta-row">
+                <span class="lc-cat">${catIcon} ${catName}</span>
+                ${cartTag}
+                <span class="lc-loads">👁 <span class="count">${loads}</span> view${loads > 1 ? 's' : ''}</span>
+            </div>
+            ${loads > 1 ? `<div style="margin-top:4px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">View Intensity</span>
+                    <span style="font-size:0.62rem;color:${viewIntensity==='high'?'var(--emerald)':viewIntensity==='medium'?'var(--amber)':'var(--cyan)'};font-weight:700;">${viewIntensity.toUpperCase()}</span>
+                </div>
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:99px;margin-top:4px;overflow:hidden;">
+                    <div style="height:100%;width:${viewBarWidth}%;background:linear-gradient(90deg,var(--cyan),${viewIntensity==='high'?'var(--emerald)':'var(--purple)'});border-radius:99px;transition:width 0.5s ease;"></div>
+                </div>
+            </div>` : ''}
+            ${item.price ? `<div class="lc-price">₹ ${item.price}</div>` : ''}
+            <div class="lc-score-box">
+                <div class="lc-score-label">Purchase Probability</div>
+                <div class="lc-score">${item.prediction}%</div>
+            </div>
+        `;
+        feed.appendChild(card);
+    });
+}
+
+function buildCategoryPills(data) {
+    const cats = {};
+    data.forEach(d => {
+        const cat = d.category || 'Other';
+        const icon = d.category_icon || '📦';
+        if (!cats[cat]) cats[cat] = {count: 0, icon};
+        cats[cat].count++;
+    });
+
+    const container = document.getElementById('catFilters');
+    // Keep the "All" pill
+    container.innerHTML = `<div class="cat-pill ${_currentFilter === 'all' ? 'active' : ''}" data-cat="all" onclick="filterCategory('all', this)">📊 All <span class="cat-count">${data.length}</span></div>`;
+    Object.entries(cats).sort((a,b) => b[1].count - a[1].count).forEach(([cat, info]) => {
+        const pill = document.createElement('div');
+        pill.className = `cat-pill ${_currentFilter === cat ? 'active' : ''}`;
+        pill.dataset.cat = cat;
+        pill.onclick = function() { filterCategory(cat, this); };
+        pill.innerHTML = `${info.icon} ${cat} <span class="cat-count">${info.count}</span>`;
+        container.appendChild(pill);
+    });
+}
 
 async function updateLiveFeed() {
-    const feed = document.getElementById('liveActivityFeed');
     const statusText = document.getElementById('liveStatusText');
     const dot = document.getElementById('liveDot');
 
@@ -265,10 +385,11 @@ async function updateLiveFeed() {
         const r = await fetch('/api/external/history');
         if (!r.ok) throw new Error('Server error ' + r.status);
         const data = await r.json();
+        _allData = data;
 
         // Status
         dot.style.background = 'var(--emerald)';
-        statusText.textContent = `AI Engine Connected · ${data.length} interaction${data.length !== 1 ? 's' : ''} captured`;
+        statusText.textContent = `AI Engine Connected · ${data.length} product${data.length !== 1 ? 's' : ''} captured`;
 
         // Update top stats dynamically
         if (data.length > 0) {
@@ -278,6 +399,8 @@ async function updateLiveFeed() {
             document.getElementById('statHighest').textContent = Math.round(Math.max(...preds)) + '%';
             const unique = new Set(data.map(d => d.product_name)).size;
             document.getElementById('statUnique').textContent = unique;
+            const cartCount = data.filter(d => d.added_to_cart).length;
+            document.getElementById('statCart').textContent = cartCount;
         }
 
         if (data.length === 0) {
@@ -291,28 +414,11 @@ async function updateLiveFeed() {
         document.getElementById('bigProductName').textContent = data[0].product_name;
         document.getElementById('bigScore').textContent = data[0].prediction + '%';
 
-        // Cards
-        if (_prev !== data.length) {
-            _prev = data.length;
-            feed.innerHTML = '';
-            data.forEach(item => {
-                const t = item.timestamp ? new Date(item.timestamp * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : 'Just now';
-                const card = document.createElement('div');
-                card.className = 'lc';
-                card.innerHTML = `
-                    <div class="lc-top">
-                        <span class="lc-badge">Captured</span>
-                        <span class="lc-time">${t}</span>
-                    </div>
-                    <div class="lc-name">${item.product_name}</div>
-                    ${item.price ? `<div class="lc-price">₹ ${item.price}</div>` : ''}
-                    <div class="lc-score-box">
-                        <div class="lc-score-label">Purchase Probability</div>
-                        <div class="lc-score">${item.prediction}%</div>
-                    </div>
-                `;
-                feed.appendChild(card);
-            });
+        // Rebuild if data changed
+        if (_prev !== JSON.stringify(data.map(d => d.prediction + d.product_name))) {
+            _prev = JSON.stringify(data.map(d => d.prediction + d.product_name));
+            buildCategoryPills(data);
+            renderCards(data);
         }
     } catch (err) {
         dot.style.background = 'var(--rose)';
