@@ -99,11 +99,11 @@
 </nav>
 
 <div class="analytics-header">
-    <div class="hero-badge"><span class="dot"></span> Live Behavioral Insights</div>
+    <div class="hero-badge"><span class="dot"></span> Hybrid Behavioral + Semantic Insights</div>
     <h1 style="font-family:'Outfit',sans-serif; font-size:clamp(2rem,5vw,3rem); font-weight:900;">
         <span style="background:linear-gradient(135deg,var(--purple),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">Real-Time Analytics</span>
     </h1>
-    <p style="color:var(--text2); max-width:550px; margin:20px auto 0;">Computed from your actual Amazon browsing sessions. No static datasets used.</p>
+    <p style="color:var(--text2); max-width:550px; margin:20px auto 0;">Computed from your actual Amazon browsing sessions. Behavioral + semantic scores fused via MDSA.</p>
 </div>
 
 <div class="stats-row">
@@ -134,32 +134,42 @@
         <div class="chart-title">⚖️ Intention Distribution</div>
         <canvas id="distChart" height="240"></canvas>
     </div>
+    <div class="chart-card">
+        <div class="chart-title" style="color:var(--pink);">🧬 Semantic vs Behavioral Scores</div>
+        <canvas id="semBehavChart" height="240"></canvas>
+    </div>
+    <div class="chart-card">
+        <div class="chart-title" style="color:var(--pink);">🎯 Semantic Alignment per Product</div>
+        <canvas id="semBarChart" height="240"></canvas>
+    </div>
 </div>
 
 <div class="table-card">
-    <div class="chart-title" style="margin-bottom:12px;">🕒 Recent Activity Log</div>
+    <div class="chart-title" style="margin-bottom:12px;">🕒 Recent Activity Log (Hybrid Scores)</div>
     <div style="overflow-x:auto;">
         <table>
             <thead>
                 <tr>
-                    <th>Timestamp</th>
                     <th>Product Name</th>
-                    <th>Intent Level</th>
+                    <th>Hybrid</th>
+                    <th>Behavioral</th>
+                    <th style="color:var(--pink);">Semantic</th>
                     <th>Price</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in stats.products %}
                 <tr>
-                    <td style="color:var(--muted);">{{ item.captured_at }}</td>
-                    <td class="tr-product">{{ item.product_name }}</td>
+                    <td class="tr-product">{{ item.product_name[:50] }}</td>
                     <td class="tr-score">{{ item.prediction }}%</td>
+                    <td style="color:var(--cyan);">{{ item.behavioral_score|default(item.prediction, true) }}%</td>
+                    <td style="color:var(--pink);">{{ item.semantic_score|default(0, true) }}%</td>
                     <td style="color:var(--amber);">{{ item.price }}</td>
                 </tr>
                 {% endfor %}
                 {% if not stats.products %}
                 <tr>
-                    <td colspan="4" style="text-align:center; padding:40px; color:var(--muted); font-style:italic;">No interactions captured yet. Visit Amazon!</td>
+                    <td colspan="5" style="text-align:center; padding:40px; color:var(--muted); font-style:italic;">No interactions captured yet. Visit Amazon!</td>
                 </tr>
                 {% endif %}
             </tbody>
@@ -167,8 +177,111 @@
     </div>
 </div>
 
+<!-- ═══ USER PREFERENCE INSIGHTS ═══ -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:20px; max-width:1200px; margin:30px auto; padding:0 20px;">
+    
+    <!-- TOP BRANDS -->
+    <div class="table-card">
+        <div class="chart-title" style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.4rem;">🏷️</span> Top Brands You're Interested In
+        </div>
+        {% if stats.top_brands %}
+        {% for brand in stats.top_brands %}
+        <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+            <div style="width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,var(--purple),var(--cyan)); display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:800; color:white; flex-shrink:0;">{{ loop.index }}</div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:0.88rem; color:var(--text);">{{ brand.name }}</div>
+                <div style="font-size:0.65rem; color:var(--muted); margin-top:2px;">
+                    {{ brand.products_count }} product{{ 's' if brand.products_count != 1 }} · {{ brand.views }} views
+                    {% if brand.cart_adds > 0 %} · 🛒 {{ brand.cart_adds }} carted{% endif %}
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:0.82rem; font-weight:800; color:var(--cyan);">{{ brand.avg_prediction }}%</div>
+                <div style="font-size:0.58rem; color:var(--muted);">avg intent</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="color:var(--muted); text-align:center; padding:30px; font-style:italic;">Browse some products to see brand preferences!</div>
+        {% endif %}
+    </div>
+
+    <!-- MOST VIEWED PRODUCTS -->
+    <div class="table-card">
+        <div class="chart-title" style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.4rem;">👁️</span> Most Viewed Products
+        </div>
+        {% if stats.most_viewed %}
+        {% for product in stats.most_viewed %}
+        <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+            <div style="width:28px; height:28px; border-radius:8px; background:{% if loop.index <= 3 %}linear-gradient(135deg,#fbbf24,#f59e0b){% else %}rgba(255,255,255,0.06){% endif %}; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:800; color:{% if loop.index <= 3 %}#000{% else %}var(--muted){% endif %}; flex-shrink:0;">{{ loop.index }}</div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; font-size:0.82rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ product.name }}</div>
+                <div style="font-size:0.62rem; color:var(--muted); margin-top:2px;">
+                    {{ product.brand }} · {{ product.category }}
+                    {% if product.added_to_cart %} · 🛒 In Cart{% endif %}
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:0.92rem; font-weight:800; color:var(--amber);">{{ product.views }}×</div>
+                <div style="font-size:0.58rem; color:var(--muted);">views</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="color:var(--muted); text-align:center; padding:30px; font-style:italic;">No data yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- TOP RECOMMENDED (FULL WIDTH) -->
+<div style="max-width:1200px; margin:0 auto 30px; padding:0 20px;">
+    <div class="table-card">
+        <div class="chart-title" style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.4rem;">🎯</span> Top Recommended — Most Likely to Purchase
+        </div>
+        {% if stats.top_recommended %}
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
+            {% for product in stats.top_recommended %}
+            <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px; transition:all 0.3s ease; position:relative; overflow:hidden;"
+                 onmouseenter="this.style.borderColor='rgba(139,92,246,0.3)';this.style.background='rgba(139,92,246,0.04)'"
+                 onmouseleave="this.style.borderColor='rgba(255,255,255,0.06)';this.style.background='rgba(255,255,255,0.02)'">
+                {% if loop.index == 1 %}
+                <div style="position:absolute; top:0; right:0; background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#000; font-size:0.6rem; font-weight:800; padding:4px 10px; border-radius:0 12px 0 8px;">🥇 TOP PICK</div>
+                {% elif loop.index == 2 %}
+                <div style="position:absolute; top:0; right:0; background:linear-gradient(135deg,#94a3b8,#cbd5e1); color:#0f172a; font-size:0.6rem; font-weight:800; padding:4px 10px; border-radius:0 12px 0 8px;">🥈 #2</div>
+                {% elif loop.index == 3 %}
+                <div style="position:absolute; top:0; right:0; background:linear-gradient(135deg,#b45309,#d97706); color:#fff; font-size:0.6rem; font-weight:800; padding:4px 10px; border-radius:0 12px 0 8px;">🥉 #3</div>
+                {% endif %}
+                <div style="font-weight:700; font-size:0.82rem; color:var(--text); margin-bottom:6px; padding-right:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ product.name }}</div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+                    <span style="font-size:0.6rem; padding:2px 8px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:6px; color:var(--purple);">{{ product.brand }}</span>
+                    <span style="font-size:0.6rem; padding:2px 8px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:6px; color:var(--cyan);">{{ product.category }}</span>
+                    <span style="font-size:0.6rem; padding:2px 8px; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); border-radius:6px; color:var(--amber);">👁 {{ product.views }}×</span>
+                    {% if product.added_to_cart %}<span style="font-size:0.6rem; padding:2px 8px; background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.2); border-radius:6px; color:var(--emerald);">🛒 Carted</span>{% endif %}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                    <div>
+                        <div style="font-size:0.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Recommendation Score</div>
+                        <div style="font-size:1.3rem; font-weight:900; background:linear-gradient(135deg,var(--purple),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">{{ product.rec_score }}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:0.58rem; color:var(--muted);">Hybrid: {{ product.prediction }}%</div>
+                        {% if product.semantic_score %}<div style="font-size:0.58rem; color:var(--pink);">Semantic: {{ product.semantic_score }}%</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="color:var(--muted); text-align:center; padding:30px; font-style:italic;">Start browsing products to see recommendations!</div>
+        {% endif %}
+    </div>
+</div>
+
 <footer class="footer">
-    <p>AdNeural Behavioral Engine — Powered by your Live Browsing History © 2026</p>
+    <p>AdNeural Hybrid Engine — Powered by your Live Browsing History © 2026</p>
 </footer>
 
 <script>
@@ -227,6 +340,56 @@
             cutout: '70%',
             plugins: {
                 legend: { position: 'bottom', labels: { padding: 20 } }
+            }
+        }
+    });
+    // Semantic vs Behavioral Scatter Chart
+    const behavScores = chartData.map(d => d.behavioral_score || d.prediction);
+    const semScores = chartData.map(d => d.semantic_score || 0);
+    
+    new Chart(document.getElementById('semBehavChart'), {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Products',
+                data: chartData.map((d, i) => ({
+                    x: behavScores[i],
+                    y: semScores[i],
+                })),
+                backgroundColor: '#ec4899',
+                borderColor: '#ec4899',
+                pointRadius: 6,
+                pointHoverRadius: 10,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { title: { display: true, text: 'Behavioral Score %', color: '#06b6d4' }, beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { title: { display: true, text: 'Semantic Score %', color: '#ec4899' }, beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+        }
+    });
+
+    // Semantic Alignment Bar Chart
+    new Chart(document.getElementById('semBarChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Semantic Alignment %',
+                data: semScores,
+                backgroundColor: 'rgba(236,72,153,0.5)',
+                borderColor: '#ec4899',
+                borderWidth: 1,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { grid: { display: false } }
             }
         }
     });

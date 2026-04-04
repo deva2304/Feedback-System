@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCLF Model Architecture — AdNeural</title>
+    <title>Hybrid CCLF + MDSA Architecture — AdNeural</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -111,9 +111,9 @@
 </nav>
 
 <div class="content">
-    <div class="badge">🧬 Model Architecture</div>
-    <h1>Correlation-Constrained <span>Latent Factor Model</span></h1>
-    <p>AdNeural v4.0 uses a mathematically grounded CCLF model that extracts latent behavioral patterns from real-time browsing data. Instead of simple heuristics, every prediction is powered by SVD decomposition, Pearson correlation analysis, and sigmoid-calibrated probability estimation.</p>
+    <div class="badge">🧬 Hybrid Model Architecture</div>
+    <h1>CCLF + <span>Multi-Dimensional Semantic Alignment</span></h1>
+    <p>AdNeural v5.0 uses a novel Hybrid Two-Stream Architecture combining a Correlation-Constrained Latent Factor Model (behavioral signals via SVD) with Multi-Dimensional Semantic Alignment (NLP understanding of products via transformer embeddings). Both streams are fused into a single purchase probability prediction.</p>
     
     <!-- Live Model Stats -->
     <div class="live-bar">
@@ -130,8 +130,16 @@
             <div class="live-stat-label">Explained Variance</div>
         </div>
         <div class="live-stat">
-            <div class="live-stat-val">8</div>
-            <div class="live-stat-label">Feature Dimensions</div>
+            <div class="live-stat-val">8 + 384</div>
+            <div class="live-stat-label">Feature Dims (Behav + Sem)</div>
+        </div>
+        <div class="live-stat" style="background:rgba(236,72,153,0.06); border-color:rgba(236,72,153,0.12);">
+            <div class="live-stat-val" style="color:var(--pink);">{% if model_meta.mdsa_enabled %}ACTIVE{% else %}OFF{% endif %}</div>
+            <div class="live-stat-label">MDSA Status</div>
+        </div>
+        <div class="live-stat" style="background:rgba(236,72,153,0.06); border-color:rgba(236,72,153,0.12);">
+            <div class="live-stat-val" style="color:var(--pink);">{{ model_meta.semantic_cache_size }}</div>
+            <div class="live-stat-label">Cached Embeddings</div>
         </div>
     </div>
 
@@ -144,12 +152,24 @@
                 <span class="meta-value">{{ model_meta.type }}</span>
             </div>
             <div class="meta-item">
-                <span class="meta-label">Latent Dimensions</span>
+                <span class="meta-label">Behavioral Latent Dims</span>
                 <span class="meta-value">k = {{ model_meta.k_latent }}</span>
             </div>
             <div class="meta-item">
-                <span class="meta-label">Feature Dimensions</span>
+                <span class="meta-label">Behavioral Feature Dims</span>
                 <span class="meta-value">d = 8</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Semantic Embedding Dims</span>
+                <span class="meta-value" style="color:var(--pink);">d = {{ model_meta.embedding_dim }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Embedding Model</span>
+                <span class="meta-value" style="color:var(--pink);">{{ model_meta.embedding_model }}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Fusion Weights</span>
+                <span class="meta-value">{{ model_meta.fusion_weights }}</span>
             </div>
             <div class="meta-item">
                 <span class="meta-label">Data Persistence</span>
@@ -160,42 +180,72 @@
                 <span class="meta-value">Cross-Site Local Injection</span>
             </div>
             <div class="meta-item">
-                <span class="meta-label">Live Sync Status</span>
-                <span class="meta-value" style="color:var(--emerald);">ACTIVE</span>
+                <span class="meta-label">MDSA Status</span>
+                <span class="meta-value" style="color:{% if model_meta.mdsa_enabled %}var(--emerald){% else %}var(--amber){% endif %};">{% if model_meta.mdsa_enabled %}ACTIVE{% else %}BEHAVIORAL ONLY{% endif %}</span>
             </div>
         </div>
     </div>
 
     <!-- Mathematical Formulation -->
     <div class="card">
-        <div class="card-title">📐 Mathematical Formulation</div>
-        <p>The TA-CCLF model factorizes the correlation-constrained behavioral matrix into low-rank latent factors using Singular Value Decomposition, upgraded with Tikhonov Regularization and Hu-Koren-Volinsky Implicit Confidence Weighting.</p>
+        <div class="card-title">📐 Stream 1: Behavioral CCLF Formulation</div>
+        <p>The TA-CCLF model factorizes the correlation-constrained behavioral matrix into low-rank latent factors using SVD, with Tikhonov Regularization and Hu-Koren-Volinsky Implicit Confidence Weighting.</p>
         
         <div class="math-block">
             <span class="comment">// Step 1: Feature extraction</span><br>
             <span class="var">x<sub>i</sub></span> = [view_count, session_dur, price, recency, velocity, cart, cat_affinity, rel_interest] ∈ <span class="highlight">ℝ<sup>8</sup></span><br><br>
             
-            <span class="comment">// Step 2: Time-Decayed Correlation Matrix (Ebbinghaus) & Tikhonov Regularization</span><br>
-            <span class="var">W</span> = diag(e<sup>-t / λ<sub>decay</sub></sup>)  <span class="comment">(exponential time decay for novelty scaling)</span><br>
-            <span class="var">C<sub>reg</sub></span> = <span class="var">X̃<sup>T</sup></span> · <span class="var">W</span> · <span class="var">X̃</span> / (n - 1) + <span class="highlight">λI</span>  where <span class="var">X̃</span> = normalized(<span class="var">X</span>)<br><br>
+            <span class="comment">// Step 2: Time-Decayed Correlation Matrix & Tikhonov Regularization</span><br>
+            <span class="var">C<sub>reg</sub></span> = <span class="var">X̃<sup>T</sup></span> · <span class="var">W</span> · <span class="var">X̃</span> / (n - 1) + <span class="highlight">λI</span><br><br>
             
-            <span class="comment">// Step 3: SVD decomposition</span><br>
-            <span class="var">C<sub>reg</sub></span> = <span class="var">U</span> · <span class="var">Σ</span> · <span class="var">V<sup>T</sup></span><br>
-            Truncate to k=<span class="highlight">{{ model_meta.k_latent }}</span> latent factors<br><br>
+            <span class="comment">// Step 3: SVD decomposition to k={{ model_meta.k_latent }} latent factors</span><br>
+            <span class="var">C<sub>reg</sub></span> = <span class="var">U</span> · <span class="var">Σ</span> · <span class="var">V<sup>T</sup></span><br><br>
             
-            <span class="comment">// Step 4: Latent space projection (Hu, Koren, Volinsky Confidence)</span><br>
-            <span class="var">c<sub>ui</sub></span> = 1 + α(log(1 + views)) + β(cart) + γ(affinity)<br>
-            <span class="var">q<sub>i</sub></span> = <span class="var">U<sub>k</sub><sup>T</sup></span> · <span class="var">x<sub>i</sub></span>  <span class="comment">(item latent)</span><br>
-            <span class="var">p<sub>u</sub></span> = Σ (<span class="var">c<sub>uj</sub></span> · <span class="var">U<sub>k</sub><sup>T</sup></span> · <span class="var">x<sub>j</sub></span>) / Σ <span class="var">c<sub>uj</sub></span>  <span class="comment">(user latent, implicitly weighted)</span><br><br>
+            <span class="comment">// Step 4: Correlation-constrained scoring</span><br>
+            <span class="var">s<sub>behavioral</sub></span> = Σ<sub>k</sub> <span class="var">p<sub>u,k</sub></span> · <span class="var">σ<sub>k</sub></span> · <span class="var">q<sub>i,k</sub></span> · <span class="var">w<sub>k</sub></span><br>
+            P<sub>behavioral</sub> = <span class="highlight">σ</span>((s - μ) / τ)
+        </div>
+    </div>
+
+    <!-- MDSA Mathematical Formulation -->
+    <div class="card" style="border-color:rgba(236,72,153,0.2);">
+        <div class="card-title" style="color:var(--pink);">🧬 Stream 2: Multi-Dimensional Semantic Alignment (MDSA)</div>
+        <p>The MDSA stream encodes product names into dense 384-dimensional vectors using a pretrained transformer model (all-MiniLM-L6-v2) and computes semantic alignment with the user's browsing history.</p>
+        
+        <div class="math-block" style="border-color:rgba(236,72,153,0.15);">
+            <span class="comment">// Step 1: Semantic embedding via pretrained transformer</span><br>
+            <span class="var">e<sub>i</sub></span> = Encoder(<span class="var">product_name<sub>i</sub></span>) ∈ <span class="highlight">ℝ<sup>384</sup></span><br><br>
             
-            <span class="comment">// Step 5: Correlation constraint</span><br>
-            <span class="var">w<sub>k</sub></span> = 1 / √<span class="var">σ<sub>k</sub></span>  <span class="comment">(penalize redundant correlated features)</span><br><br>
+            <span class="comment">// Step 2: Time-decayed cosine similarity with browsing history</span><br>
+            sim(<span class="var">e<sub>i</sub></span>, <span class="var">e<sub>j</sub></span>) = (<span class="var">e<sub>i</sub></span> · <span class="var">e<sub>j</sub></span>) / (||<span class="var">e<sub>i</sub></span>|| × ||<span class="var">e<sub>j</sub></span>||)<br>
+            <span class="var">w<sub>j</sub></span> = e<sup>-Δt<sub>j</sub> / λ<sub>sem</sub></sup> <span class="comment">(Ebbinghaus time decay)</span><br><br>
             
-            <span class="comment">// Step 6: Score computation</span><br>
-            <span class="var">s</span> = Σ<sub>k</sub> <span class="var">p<sub>u,k</sub></span> · <span class="var">σ<sub>k</sub></span> · <span class="var">q<sub>i,k</sub></span> · <span class="var">w<sub>k</sub></span><br><br>
+            <span class="comment">// Step 3: Weighted mean semantic alignment</span><br>
+            <span class="var">S<sub>align</sub></span> = Σ<sub>j</sub> (<span class="var">w<sub>j</sub></span> × sim(<span class="var">e<sub>i</sub></span>, <span class="var">e<sub>j</sub></span>)) / Σ<sub>j</sub> <span class="var">w<sub>j</sub></span><br><br>
             
-            <span class="comment">// Step 7: Platt Scaling Probability Calibration</span><br>
-            P(y=1) = <span class="highlight">σ</span>((s - μ) / τ)  <span class="comment">(temperature-calibrated logistic function)</span>
+            <span class="comment">// Step 4: Multi-dimensional decomposition</span><br>
+            D₁ = <span style="color:var(--pink);">Functional</span> alignment (overall semantic similarity)<br>
+            D₂ = <span style="color:var(--pink);">Brand/Quality</span> tier (lexical overlap clustering)<br>
+            D₃ = <span style="color:var(--pink);">Category</span> coherence (same product family ratio)
+        </div>
+    </div>
+
+    <!-- Hybrid Fusion -->
+    <div class="card" style="border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.04);">
+        <div class="card-title">⚖️ Hybrid Fusion Layer</div>
+        <p>The final purchase probability is computed by fusing both streams with adaptive weights. Cold-start products (first view) receive higher semantic weight since there is no behavioral data yet.</p>
+        
+        <div class="math-block" style="border-color:rgba(139,92,246,0.2);">
+            <span class="comment">// Normal mode (views > 1)</span><br>
+            P<sub>final</sub> = <span class="highlight">0.65</span> × P<sub>behavioral</sub> + <span style="color:var(--pink);font-weight:700;">0.35</span> × S<sub>align</sub><br><br>
+
+            <span class="comment">// Cold-start mode (first view)</span><br>
+            P<sub>final</sub> = <span class="highlight">0.45</span> × P<sub>behavioral</sub> + <span style="color:var(--pink);font-weight:700;">0.55</span> × S<sub>align</sub>
+        </div>
+        
+        <div style="margin:16px 0; padding-left:20px; border-left:3px solid var(--pink);">
+            <p style="margin-bottom:8px;"><strong style="color:var(--pink);">Cold Start Advantage</strong>: New products with zero behavioral history still get meaningful predictions via semantic alignment with the user's browsing profile.</p>
+            <p style="margin-bottom:0;"><strong style="color:var(--cyan);">Engagement Amplification</strong>: As the user browses more, behavioral weight increases and the model grows more confident in its predictions.</p>
         </div>
     </div>
 
@@ -242,48 +292,55 @@
 
     <!-- Prediction Pipeline -->
     <div class="card">
-        <div class="card-title">⚡ Real-Time Prediction Pipeline</div>
+        <div class="card-title">⚡ Hybrid Real-Time Prediction Pipeline</div>
         <div class="pipeline">
             <div class="pipeline-step">
                 <div class="pipeline-num">1</div>
                 <div class="pipeline-content">
                     <div class="pipeline-title">Extension Captures</div>
-                    <div class="pipeline-desc">Browser extension detects Amazon product pages and sends product name, price, and URL to the local Flask server. Every page load is tracked — revisits increment the view count.</div>
+                    <div class="pipeline-desc">Browser extension detects Amazon product pages and sends product name, price, and URL to the local Flask server.</div>
                 </div>
             </div>
             <div class="pipeline-step">
                 <div class="pipeline-num">2</div>
                 <div class="pipeline-content">
-                    <div class="pipeline-title">Feature Extraction</div>
+                    <div class="pipeline-title">Behavioral Feature Extraction</div>
                     <div class="pipeline-desc">8 behavioral features are extracted from the session: view count, duration, price, recency, velocity, cart status, category affinity, and relative interest.</div>
                 </div>
             </div>
             <div class="pipeline-step">
-                <div class="pipeline-num">3</div>
+                <div class="pipeline-num" style="background:linear-gradient(135deg,var(--pink),var(--purple));">3</div>
                 <div class="pipeline-content">
-                    <div class="pipeline-title">Correlation Matrix</div>
-                    <div class="pipeline-desc">A Pearson correlation matrix is computed across all tracked products to identify which features provide independent signal vs. redundant information.</div>
+                    <div class="pipeline-title" style="color:var(--pink);">Semantic Embedding (MDSA)</div>
+                    <div class="pipeline-desc">Product name is encoded into a 384-dimensional dense vector via all-MiniLM-L6-v2 transformer. Result is cached for instant reuse.</div>
                 </div>
             </div>
             <div class="pipeline-step">
                 <div class="pipeline-num">4</div>
                 <div class="pipeline-content">
-                    <div class="pipeline-title">SVD Decomposition</div>
-                    <div class="pipeline-desc">The correlation matrix is decomposed via SVD into k={{ model_meta.k_latent }} latent factors. These capture the dominant patterns of correlated behavior.</div>
+                    <div class="pipeline-title">Correlation Matrix + SVD</div>
+                    <div class="pipeline-desc">Pearson correlation matrix is built across products, regularized (Tikhonov), and decomposed into k={{ model_meta.k_latent }} latent factors via SVD.</div>
                 </div>
             </div>
             <div class="pipeline-step">
-                <div class="pipeline-num">5</div>
+                <div class="pipeline-num" style="background:linear-gradient(135deg,var(--pink),var(--purple));">5</div>
                 <div class="pipeline-content">
-                    <div class="pipeline-title">Constrained Scoring</div>
-                    <div class="pipeline-desc">User and item latent vectors are computed, then a correlation-constrained dot product produces the raw prediction score. Redundant features are penalized.</div>
+                    <div class="pipeline-title" style="color:var(--pink);">Multi-Dimensional Semantic Alignment</div>
+                    <div class="pipeline-desc">Cosine similarity between current product embedding and time-weighted history embeddings, decomposed across 3 dimensions: Functional, Brand/Quality, Category.</div>
                 </div>
             </div>
             <div class="pipeline-step">
                 <div class="pipeline-num">6</div>
                 <div class="pipeline-content">
-                    <div class="pipeline-title">Sigmoid Calibration</div>
-                    <div class="pipeline-desc">The raw score is passed through a calibrated sigmoid function to produce a purchase probability between 0% and 100%, with realistic bounds.</div>
+                    <div class="pipeline-title">Behavioral SVD Scoring</div>
+                    <div class="pipeline-desc">Correlation-constrained dot product with Hu-Koren-Volinsky implicit confidence weighting, calibrated via Platt scaling sigmoid.</div>
+                </div>
+            </div>
+            <div class="pipeline-step">
+                <div class="pipeline-num" style="background:linear-gradient(135deg,var(--emerald),var(--cyan));">7</div>
+                <div class="pipeline-content">
+                    <div class="pipeline-title" style="color:var(--emerald);">Hybrid Fusion</div>
+                    <div class="pipeline-desc">Behavioral (65%) and semantic (35%) scores are fused. Cold-start products shift to 45%/55% to compensate for missing behavioral data.</div>
                 </div>
             </div>
         </div>
@@ -292,13 +349,22 @@
     <!-- Why Correlation Constraints? -->
     <div class="card">
         <div class="card-title">🎯 Why Correlation Constraints?</div>
-        <p>In standard latent factor models, highly correlated features (e.g., view count and session duration) can dominate predictions, leading to redundant signals and lower accuracy.</p>
-        <p>The <strong>correlation constraint</strong> applies an inverse-sqrt weighting from the SVD singular values. This means:</p>
+        <p>In standard latent factor models, correlated features can dominate predictions. The correlation constraint applies inverse-sqrt weighting from SVD singular values, penalizing redundant signals.</p>
         <div style="margin:16px 0; padding-left:20px; border-left:3px solid var(--purple);">
-            <p style="margin-bottom:8px;"><strong style="color:var(--emerald);">Independent features</strong> (low correlation with others) receive <strong>higher weight</strong> — they provide unique signal.</p>
-            <p style="margin-bottom:0;"><strong style="color:var(--amber);">Redundant features</strong> (high correlation with others) receive <strong>lower weight</strong> — the model deduplicates the signal automatically.</p>
+            <p style="margin-bottom:8px;"><strong style="color:var(--emerald);">Independent features</strong> receive <strong>higher weight</strong> — they provide unique signal.</p>
+            <p style="margin-bottom:0;"><strong style="color:var(--amber);">Redundant features</strong> receive <strong>lower weight</strong> — the model deduplicates automatically.</p>
         </div>
-        <p style="margin-top:16px;">This constraint is especially powerful for this use case because behavioral signals like "view count" and "view velocity" are naturally correlated — CCLF ensures the model doesn't double-count them.</p>
+    </div>
+
+    <!-- Why Semantic Alignment? -->
+    <div class="card" style="border-color:rgba(236,72,153,0.2);">
+        <div class="card-title" style="color:var(--pink);">🧬 Why Multi-Dimensional Semantic Alignment?</div>
+        <p>Behavioral models alone cannot understand <em>what</em> a product is — only <em>how</em> the user interacts with it. MDSA solves this by adding textual understanding:</p>
+        <div style="margin:16px 0; padding-left:20px; border-left:3px solid var(--pink);">
+            <p style="margin-bottom:8px;"><strong style="color:var(--pink);">Cold Start Solution</strong>: A brand new product with zero views still gets a meaningful score based on its semantic similarity to previously browsed items.</p>
+            <p style="margin-bottom:8px;"><strong style="color:var(--pink);">Cross-Category Discovery</strong>: MDSA knows that "AirPods" and "Sony WH-1000XM5" are semantically related even though their categories might differ.</p>
+            <p style="margin-bottom:0;"><strong style="color:var(--pink);">3 Alignment Dimensions</strong>: Functional purpose, Brand/Quality tier, and Category coherence provide granular understanding of product similarity.</p>
+        </div>
     </div>
 
     <!-- Privacy -->
@@ -309,7 +375,7 @@
 </div>
 
 <footer class="footer">
-    <p>© 2026 AdNeural — Correlation-Constrained Latent Factor Model v4.0</p>
+    <p>© 2026 AdNeural — Hybrid CCLF + MDSA Architecture v5.0</p>
 </footer>
 
 </body>

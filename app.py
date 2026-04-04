@@ -9,6 +9,208 @@ from datetime import datetime
 import random
 import numpy as np
 
+# ═══════════════════════════════════════════════════════════
+# MULTI-DIMENSIONAL SEMANTIC ALIGNMENT ENGINE (MDSA)
+# ═══════════════════════════════════════════════════════════
+#
+#  Novel contribution: textual semantic understanding of products
+#  using dense sentence embeddings from a pretrained transformer.
+#
+#  The MDSA layer works alongside the CCLF behavioral engine to
+#  create a Hybrid Two-Stream Architecture:
+#    Stream 1 (CCLF): HOW the user behaves (clicks, time, cart)
+#    Stream 2 (MDSA): WHAT the product means (semantic similarity)
+#
+#  This solves the Cold Start Problem — new products with zero
+#  behavioral history still get meaningful scores via semantic
+#  alignment with previously viewed products.
+#
+# ═══════════════════════════════════════════════════════════
+
+try:
+    from sentence_transformers import SentenceTransformer
+    print("[MDSA] Loading semantic embedding model (all-MiniLM-L6-v2)...")
+    SEMANTIC_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+    MDSA_AVAILABLE = True
+    EMBEDDING_DIM = 384
+    print(f"[MDSA] Model loaded — {EMBEDDING_DIM}-dimensional embeddings ready")
+except Exception as e:
+    print(f"[MDSA] WARNING: Could not load semantic model: {e}")
+    print("[MDSA] Falling back to behavioral-only mode (CCLF)")
+    SEMANTIC_MODEL = None
+    MDSA_AVAILABLE = False
+    EMBEDDING_DIM = 0
+
+# Semantic embedding cache — keyed by product name
+SEMANTIC_CACHE = {}
+
+# MDSA Hyperparameters
+OMEGA_BEHAVIORAL = 0.65       # Weight for behavioral SVD score
+OMEGA_SEMANTIC = 0.35         # Weight for semantic alignment score
+OMEGA_COLD_BEHAVIORAL = 0.45  # Cold start: shift weight to semantic
+OMEGA_COLD_SEMANTIC = 0.55    # Cold start: semantic dominates
+SEMANTIC_DECAY_HOURS = 12     # Time decay half-life for semantic weighting
+
+
+def get_semantic_embedding(product_name):
+    """
+    Generate a 384-dimensional dense semantic embedding for a product name.
+    
+    Uses the all-MiniLM-L6-v2 transformer model to encode the product name
+    into a vector that captures its semantic meaning. Results are cached.
+    
+    Returns: numpy array of shape (384,) or None if MDSA is unavailable
+    """
+    if not MDSA_AVAILABLE or not product_name:
+        return None
+    
+    # Check cache (normalize key for consistency)
+    cache_key = product_name.strip().lower()
+    if cache_key in SEMANTIC_CACHE:
+        return SEMANTIC_CACHE[cache_key]
+    
+    try:
+        embedding = SEMANTIC_MODEL.encode(product_name, normalize_embeddings=True)
+        embedding = np.array(embedding, dtype=np.float32)
+        SEMANTIC_CACHE[cache_key] = embedding
+        return embedding
+    except Exception as e:
+        print(f"[MDSA] Embedding error for '{product_name[:30]}': {e}")
+        return None
+
+
+def compute_semantic_alignment(current_product_name, current_url, all_sessions, history):
+    r"""
+    Multi-Dimensional Semantic Alignment (MDSA)
+    
+    Computes how semantically aligned the current product is with the user's
+    entire browsing history using dense transformer embeddings.
+    
+    Mathematical formulation:
+      e_i = Encoder(product_name_i)   ∈ R^{384}      (sentence embedding)
+      w_j = e^{-Δt_j / \lambda_{sem}}                 (time-decay weight)
+      
+      sim(e_i, e_j) = (e_i · e_j) / (||e_i|| × ||e_j||)  (cosine similarity)
+      
+      S_{align} = Σ_j (w_j × sim(e_i, e_j)) / Σ_j w_j    (weighted mean alignment)
+    
+    Additionally computes 3 semantic dimension scores:
+      D1: Functional alignment  — how similar in purpose
+      D2: Brand/Quality tier    — premium vs budget clustering  
+      D3: Category coherence    — same product family
+    
+    Returns: dict with semantic_score, dimension_scores, top_similar
+    """
+    result = {
+        'semantic_score': 0.0,
+        'top_similar': [],
+        'dimension_scores': {
+            'functional': 0.0,
+            'brand_quality': 0.0,
+            'category': 0.0,
+        },
+        'n_compared': 0,
+    }
+    
+    if not MDSA_AVAILABLE:
+        return result
+    
+    current_embedding = get_semantic_embedding(current_product_name)
+    if current_embedding is None:
+        return result
+    
+    now = _time.time()
+    similarities = []
+    
+    # Compare against all products in browsing history
+    for entry in history:
+        entry_url = entry.get('url', '')
+        entry_name = entry.get('product_name', '')
+        
+        # Skip self-comparison
+        if entry_url == current_url or not entry_name:
+            continue
+        
+        other_embedding = get_semantic_embedding(entry_name)
+        if other_embedding is None:
+            continue
+        
+        # Cosine similarity (embeddings are already normalized)
+        cosine_sim = float(np.dot(current_embedding, other_embedding))
+        
+        # Time-decay weighting (recent products matter more)
+        entry_time = entry.get('timestamp', now)
+        hours_ago = (now - entry_time) / 3600
+        time_weight = math.exp(-hours_ago / SEMANTIC_DECAY_HOURS)
+        
+        # Session engagement weight (products with more views contribute more)
+        session = all_sessions.get(entry_url, {})
+        engagement = math.log(1 + session.get('page_loads', 1))
+        
+        weighted_sim = cosine_sim * time_weight * engagement
+        
+        similarities.append({
+            'product_name': entry_name,
+            'cosine_sim': cosine_sim,
+            'weighted_sim': weighted_sim,
+            'time_weight': time_weight,
+        })
+    
+    if not similarities:
+        return result
+    
+    # Compute weighted average semantic alignment
+    total_weight = sum(s['weighted_sim'] for s in similarities)
+    total_raw_weight = sum(s['time_weight'] for s in similarities)
+    
+    if total_raw_weight > 0:
+        weighted_avg = sum(s['cosine_sim'] * s['time_weight'] for s in similarities) / total_raw_weight
+    else:
+        weighted_avg = 0.0
+    
+    # Scale to 0-100 range (cosine sim is typically 0 to 1 for similar products)
+    semantic_score = max(0.0, min(weighted_avg * 100, 100.0))
+    
+    # Top 3 most semantically similar products
+    similarities.sort(key=lambda x: x['cosine_sim'], reverse=True)
+    top_similar = [
+        {'name': s['product_name'][:60], 'similarity': round(s['cosine_sim'] * 100, 1)}
+        for s in similarities[:3]
+    ]
+    
+    # ── Multi-Dimensional Scores ──
+    # Dimension 1: Functional alignment (overall semantic similarity)
+    functional_score = semantic_score
+    
+    # Dimension 2: Brand/Quality tier alignment
+    # Products in same price tier tend to cluster semantically
+    brand_keywords_current = set(current_product_name.lower().split())
+    brand_overlap_scores = []
+    for s in similarities:
+        other_words = set(s['product_name'].lower().split())
+        overlap = len(brand_keywords_current & other_words)
+        total = max(len(brand_keywords_current | other_words), 1)
+        brand_overlap_scores.append(overlap / total * s['time_weight'])
+    brand_quality = sum(brand_overlap_scores) / max(sum(s['time_weight'] for s in similarities), 1e-8) * 100
+    
+    # Dimension 3: Category coherence
+    current_category = categorize_product(current_product_name)
+    same_cat_count = sum(1 for s in similarities 
+                         if categorize_product(s['product_name']) == current_category)
+    category_score = (same_cat_count / max(len(similarities), 1)) * 100
+    
+    result['semantic_score'] = round(semantic_score, 1)
+    result['top_similar'] = top_similar
+    result['dimension_scores'] = {
+        'functional': round(functional_score, 1),
+        'brand_quality': round(min(brand_quality, 100), 1),
+        'category': round(category_score, 1),
+    }
+    result['n_compared'] = len(similarities)
+    
+    return result
+
+
 app = Flask(__name__)
 
 
@@ -238,7 +440,7 @@ load_captured_history()
 
 # Model hyperparameters
 K_LATENT = 5            # Number of latent factors
-ALPHA_CONFIDENCE = 40   # Confidence scaling: c = 1 + α·r
+ALPHA_CONFIDENCE = 10   # Confidence scaling: c = 1 + α·log(1+views)  [was 40 → saturation fix]
 LAMBDA_REG = 0.1        # Regularization strength
 SIGMOID_SCALE = 2.8     # Sigmoid steepness
 SIGMOID_SHIFT = -1.2    # Sigmoid horizontal shift
@@ -400,7 +602,7 @@ def compute_explained_variance(sigma):
 
 
 def calculate_purchase_chance(data):
-    """
+    r"""
     Time-Aware Correlation-Constrained Latent Factor Model (TA-CCLF)
     
     Academic Implementation featuring:
@@ -500,12 +702,11 @@ def calculate_purchase_chance(data):
     for i, s_url in enumerate(all_urls):
         s = EXTERNAL_SESSIONS.get(s_url, {})
         
-        # c_ui = 1 + α*views + β*cart + γ*affinity
-        # This replaces the ad-hoc post-SVD boosts with mathematical confidence mapping.
+        # c_ui = 1 + α*log(views) + β*cart + γ*affinity
         c_ui = 1.0 
         c_ui += ALPHA_CONFIDENCE * math.log(1 + s.get('page_loads', 1))
-        c_ui += 60.0 if s.get('added_to_cart') else 0.0
-        c_ui += 15.0 if s.get('category') == session.get('category') else 0.0
+        c_ui += 20.0 if s.get('added_to_cart') else 0.0
+        c_ui += 5.0 if s.get('category') == session.get('category') else 0.0
         
         fv = all_feature_vecs[i]
         proj = U_k.T @ fv[:U_k.shape[0]]
@@ -530,10 +731,14 @@ def calculate_purchase_chance(data):
     # ── Step 8: Compute constrained dot product score ──
     raw_score = np.sum(user_latent * sigma_k * item_latent * constraint_weights)
     
+    # Normalize raw score by product count to prevent catalog-size saturation
+    n_products = len(EXTERNAL_SESSIONS)
+    raw_score = raw_score / (1.0 + n_products * 0.5)
+    
     # ── Step 9: Platt Scaling for Probability Output ──
     # P(purchase) = sigmoid((s - mu) / tau)
-    tau_temp = 1.6   # Temperature parameter
-    mu_shift = -2.2  # Mean threshold shift
+    tau_temp = 3.5   # Temperature parameter (wider spread)
+    mu_shift = 0.0   # Center sigmoid at neutral 50%
     
     logit = (raw_score - mu_shift) / tau_temp
     # Cap logit to prevent overflow
@@ -546,17 +751,56 @@ def calculate_purchase_chance(data):
     
     # Apply correlation-based confidence adjustment
     # More data = more confident = wider range of predictions
-    n_products = len(EXTERNAL_SESSIONS)
     confidence_factor = min(n_products / 5, 1.0)  # Full confidence at 5+ products
     
     # Blend toward base rate for low confidence
-    base_rate = 8.0  # Base purchase probability with minimal data
+    base_rate = 12.0  # Base purchase probability with minimal data
     purchase_pct = base_rate + (purchase_pct - base_rate) * (0.4 + 0.6 * confidence_factor)
     
-    # Clamp to realistic bounds
-    purchase_pct = max(3.0, min(purchase_pct, 97.0))
+    # Clamp behavioral score to realistic bounds
+    behavioral_pct = max(3.0, min(purchase_pct, 97.0))
     
-    return round(purchase_pct, 1)
+    # ══════════════════════════════════════════════════════════
+    # MULTI-DIMENSIONAL SEMANTIC ALIGNMENT FUSION
+    # ══════════════════════════════════════════════════════════
+    #
+    #  Hybrid Two-Stream Fusion:
+    #    final = ω_b × behavioral_score + ω_s × semantic_score
+    #
+    #  Cold-Start Adaptation:
+    #    When page_loads == 1 (first view), semantic weight increases
+    #    because there's minimal behavioral data to work with.
+    #
+    # ══════════════════════════════════════════════════════════
+    
+    product_name = data.get('product_name', '')
+    semantic_result = compute_semantic_alignment(
+        product_name, url, EXTERNAL_SESSIONS, CAPTURED_HISTORY
+    )
+    semantic_pct = semantic_result.get('semantic_score', 0.0)
+    
+    # Choose fusion weights based on data availability
+    page_loads = session.get('page_loads', 1)
+    if page_loads <= 1 and MDSA_AVAILABLE:
+        # Cold start: trust semantic more
+        w_b, w_s = OMEGA_COLD_BEHAVIORAL, OMEGA_COLD_SEMANTIC
+    else:
+        w_b, w_s = OMEGA_BEHAVIORAL, OMEGA_SEMANTIC
+    
+    # If MDSA is unavailable or no history exists, use pure behavioral
+    if not MDSA_AVAILABLE or semantic_pct == 0.0:
+        final_pct = behavioral_pct
+    else:
+        final_pct = w_b * behavioral_pct + w_s * semantic_pct
+    
+    # Final clamping
+    final_pct = max(3.0, min(final_pct, 97.0))
+    
+    # Store semantic info for API responses
+    session['_last_semantic'] = semantic_result
+    session['_last_behavioral_pct'] = round(behavioral_pct, 1)
+    
+    return round(final_pct, 1)
 
 
 def get_model_meta():
@@ -580,7 +824,7 @@ def get_model_meta():
         explained_var = 0.0
     
     return {
-        'type': 'Time-Aware CCLF (TA-CCLF) with Tikhonov Regularization',
+        'type': 'Hybrid TA-CCLF + Multi-Dimensional Semantic Alignment (MDSA)',
         'signals': FEATURE_NAMES,
         'k_latent': K_LATENT,
         'explained_variance': round(explained_var, 1),
@@ -588,12 +832,48 @@ def get_model_meta():
         'data_source': 'Live Amazon Browsing (via Browser Extension)',
         'storage': CAPTURED_CSV,
         'total_captured': len(CAPTURED_HISTORY),
+        'mdsa_enabled': MDSA_AVAILABLE,
+        'embedding_dim': EMBEDDING_DIM,
+        'embedding_model': 'all-MiniLM-L6-v2' if MDSA_AVAILABLE else 'N/A',
+        'fusion_weights': f'{OMEGA_BEHAVIORAL:.0%} behavioral / {OMEGA_SEMANTIC:.0%} semantic',
+        'semantic_cache_size': len(SEMANTIC_CACHE),
     }
 
 
 # ═══════════════════════════════════════════════════════════
 # ANALYTICS — Computed from YOUR real captured data
 # ═══════════════════════════════════════════════════════════
+
+# Known brand patterns for extraction
+KNOWN_BRANDS = [
+    'Apple', 'Samsung', 'OnePlus', 'Xiaomi', 'Redmi', 'Poco', 'Realme', 'Oppo', 'Vivo',
+    'Sony', 'Bose', 'JBL', 'Boat', 'Noise', 'Nothing', 'Google', 'Motorola', 'Nokia',
+    'Lenovo', 'HP', 'Dell', 'Asus', 'Acer', 'MSI', 'LG', 'Philips', 'Panasonic',
+    'Nike', 'Adidas', 'Puma', 'Titan', 'Fastrack', 'Fossil', 'Fire-Boltt', 'boAt',
+    'CEDO', 'CMFF', 'iQOO', 'Infinix', 'Tecno', 'Honor', 'HTC', 'Marshall', 'Sennheiser',
+    'Skullcandy', 'AKG', 'Beats', 'Audio-Technica', 'Jabra', 'Anker', 'Mivi',
+]
+
+def extract_brand(product_name):
+    """Extract brand name from a product name using known brands + heuristics."""
+    if not product_name:
+        return 'Unknown'
+    
+    name_lower = product_name.lower()
+    
+    # Check known brands first (case-insensitive)
+    for brand in KNOWN_BRANDS:
+        if brand.lower() in name_lower:
+            return brand
+    
+    # Heuristic: first word is often the brand
+    first_word = product_name.split()[0] if product_name.split() else 'Unknown'
+    # Only use if it looks like a proper noun (capitalized, 2+ chars)
+    if len(first_word) >= 2 and first_word[0].isupper() and first_word.isalpha():
+        return first_word
+    
+    return 'Other'
+
 
 def compute_live_analytics():
     """Generate analytics from captured real-time data."""
@@ -608,6 +888,9 @@ def compute_live_analytics():
             'categories': {},
             'cart_count': 0,
             'total_views': 0,
+            'top_brands': [],
+            'most_viewed': [],
+            'top_recommended': [],
         }
 
     predictions = [h['prediction'] for h in CAPTURED_HISTORY]
@@ -636,7 +919,91 @@ def compute_live_analytics():
         'categories': categories,
         'cart_count': cart_count,
         'total_views': total_views,
+        'top_brands': compute_top_brands(),
+        'most_viewed': compute_most_viewed(),
+        'top_recommended': compute_top_recommended(),
     }
+
+
+def compute_top_brands():
+    """Rank brands by total views and number of distinct products browsed."""
+    brand_stats = {}
+    for h in CAPTURED_HISTORY:
+        brand = extract_brand(h.get('product_name', ''))
+        if brand not in brand_stats:
+            brand_stats[brand] = {'views': 0, 'products': set(), 'cart': 0, 'total_pred': 0}
+        brand_stats[brand]['views'] += h.get('page_loads', 1)
+        brand_stats[brand]['products'].add(h.get('product_name', ''))
+        brand_stats[brand]['total_pred'] += h.get('prediction', 0)
+        if h.get('added_to_cart'):
+            brand_stats[brand]['cart'] += 1
+    
+    # Score = views * 2 + distinct_products * 3 + cart_adds * 10
+    brand_list = []
+    for brand, stats in brand_stats.items():
+        score = stats['views'] * 2 + len(stats['products']) * 3 + stats['cart'] * 10
+        avg_pred = stats['total_pred'] / max(len(stats['products']), 1)
+        brand_list.append({
+            'name': brand,
+            'views': stats['views'],
+            'products_count': len(stats['products']),
+            'cart_adds': stats['cart'],
+            'score': score,
+            'avg_prediction': round(avg_pred, 1),
+        })
+    
+    brand_list.sort(key=lambda x: x['score'], reverse=True)
+    return brand_list[:8]
+
+
+def compute_most_viewed():
+    """Rank products by view count (page_loads)."""
+    products = []
+    for h in CAPTURED_HISTORY:
+        products.append({
+            'name': h.get('product_name', '')[:60],
+            'views': h.get('page_loads', 1),
+            'prediction': h.get('prediction', 0),
+            'category': h.get('category', 'Other'),
+            'brand': extract_brand(h.get('product_name', '')),
+            'added_to_cart': h.get('added_to_cart', False),
+        })
+    products.sort(key=lambda x: x['views'], reverse=True)
+    return products[:8]
+
+
+def compute_top_recommended():
+    """
+    Rank products by purchase likelihood.
+    
+    Score combines:
+    - Hybrid prediction (behavioral + semantic)
+    - View intensity bonus (more views = more interested)
+    - Cart bonus
+    
+    This gives the user's "most likely to purchase" ranking.
+    """
+    products = []
+    for h in CAPTURED_HISTORY:
+        pred = h.get('prediction', 0)
+        views = h.get('page_loads', 1)
+        cart = h.get('added_to_cart', False)
+        
+        # Composite recommendation score
+        rec_score = pred * 0.6 + min(views * 5, 30) + (20 if cart else 0)
+        
+        products.append({
+            'name': h.get('product_name', '')[:60],
+            'prediction': pred,
+            'views': views,
+            'category': h.get('category', 'Other'),
+            'brand': extract_brand(h.get('product_name', '')),
+            'added_to_cart': cart,
+            'rec_score': round(rec_score, 1),
+            'semantic_score': h.get('semantic_score', 0),
+        })
+    products.sort(key=lambda x: x['rec_score'], reverse=True)
+    return products[:8]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -647,6 +1014,7 @@ def compute_live_analytics():
 def home():
     stats = compute_live_analytics()
     return render_template('index.html',
+                           stats=stats,
                            total_products=stats['total_products_viewed'],
                            total_interactions=stats['total_interactions'],
                            avg_prediction=stats['avg_prediction'],
@@ -722,6 +1090,10 @@ def track_external():
                 existing_idx = i
                 break
 
+        # Get semantic info from session
+        semantic_info = session.get('_last_semantic', {})
+        behavioral_score = session.get('_last_behavioral_pct', chance)
+        
         new_entry = {
             "product_name": product_name,
             "price": price,
@@ -732,6 +1104,10 @@ def track_external():
             "category_icon": category_icon,
             "added_to_cart": added_to_cart,
             "page_loads": page_loads,
+            "semantic_score": semantic_info.get('semantic_score', 0),
+            "behavioral_score": behavioral_score,
+            "top_similar": semantic_info.get('top_similar', []),
+            "dimension_scores": semantic_info.get('dimension_scores', {}),
         }
 
         if existing_idx is not None:
@@ -753,6 +1129,11 @@ def track_external():
             "added_to_cart": added_to_cart,
             "page_loads": page_loads,
             "is_revisit": is_revisit,
+            "semantic_score": semantic_info.get('semantic_score', 0),
+            "behavioral_score": behavioral_score,
+            "top_similar": semantic_info.get('top_similar', []),
+            "dimension_scores": semantic_info.get('dimension_scores', {}),
+            "mdsa_enabled": MDSA_AVAILABLE,
         })
     except Exception as e:
         print(f"[TRACKER] Error: {e}")
@@ -828,8 +1209,8 @@ def api_status():
     stats = compute_live_analytics()
     meta = get_model_meta()
     return jsonify({
-        'model': 'Correlation-Constrained Latent Factor Model (CCLF)',
-        'model_version': 'v4.0',
+        'model': 'Hybrid CCLF + MDSA (Multi-Dimensional Semantic Alignment)',
+        'model_version': 'v5.0',
         'latent_factors': K_LATENT,
         'explained_variance': meta['explained_variance'],
         'data_source': 'Live Amazon Browsing',
@@ -839,6 +1220,11 @@ def api_status():
         'csv_file': CAPTURED_CSV,
         'csv_exists': os.path.exists(CAPTURED_CSV),
         'features': FEATURE_NAMES,
+        'mdsa_enabled': MDSA_AVAILABLE,
+        'embedding_model': 'all-MiniLM-L6-v2' if MDSA_AVAILABLE else 'N/A',
+        'embedding_dim': EMBEDDING_DIM,
+        'fusion_weights': {'behavioral': OMEGA_BEHAVIORAL, 'semantic': OMEGA_SEMANTIC},
+        'semantic_cache_size': len(SEMANTIC_CACHE),
     })
 
 
@@ -850,8 +1236,10 @@ if __name__ == '__main__':
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     
     print("\n" + "="*60)
-    print("  AdNeural - Correlation-Constrained Latent Factor Model")
-    print(f"  Model: CCLF with k={K_LATENT} latent factors")
+    print("  AdNeural — Hybrid Two-Stream Purchase Predictor")
+    print(f"  Stream 1: CCLF Behavioral Engine (k={K_LATENT} latent factors)")
+    print(f"  Stream 2: MDSA Semantic Engine ({'ACTIVE — ' + str(EMBEDDING_DIM) + 'D embeddings' if MDSA_AVAILABLE else 'INACTIVE'})")
+    print(f"  Fusion: {OMEGA_BEHAVIORAL:.0%} behavioral + {OMEGA_SEMANTIC:.0%} semantic")
     print("  Waiting for Amazon Safe Tracker extension data...")
     print("  Saving interactions to: " + CAPTURED_CSV)
     print("="*60 + "\n")

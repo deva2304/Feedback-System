@@ -173,10 +173,10 @@
 <section class="hero">
     <div class="hero-badge">
         <span class="dot"></span>
-        Correlation-Constrained Latent Factors
+        Hybrid CCLF + Semantic Alignment
     </div>
     <h1>Your AI <span>Purchase Predictor</span></h1>
-    <p>Powered by a Correlation-Constrained Latent Factor Model — every product you view is captured and analyzed using SVD-decomposed behavioral features to predict purchase probability in real-time.</p>
+    <p>Powered by a Hybrid Two-Stream Architecture — combining Correlation-Constrained Latent Factors (behavioral analysis) with Multi-Dimensional Semantic Alignment (NLP product understanding) to predict purchase probability in real-time.</p>
 
     <div class="stats-row">
         <div class="stat-card">
@@ -237,33 +237,108 @@
     </div>
 </section>
 
+<!-- User Profile Insights -->
+<section class="section">
+    <div class="section-header">
+        <div class="section-label" style="color:var(--amber);">Your Profile Insights</div>
+        <h2 class="section-title">Top Preferences & Recommendations</h2>
+        <p class="section-desc">Based on your live browsing history across all captures.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+        
+        <!-- Top Brands -->
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">
+            <div style="font-size:1.1rem; font-weight:700; margin-bottom:16px; color:var(--text); display:flex; align-items:center; gap:8px;">
+                <span>🏷️</span> Top Brands
+            </div>
+            {% if stats.top_brands %}
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                {% for brand in stats.top_brands[:4] %}
+                <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="width:24px; height:24px; background:linear-gradient(135deg,var(--purple),var(--cyan)); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:800; color:#fff;">{{ loop.index }}</div>
+                        <div>
+                            <div style="font-weight:700; font-size:0.9rem;">{{ brand.name }}</div>
+                            <div style="font-size:0.65rem; color:var(--muted);">{{ brand.views }} views · {{ brand.products_count }} products</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="color:var(--muted); font-size:0.8rem; font-style:italic;">No brands tracked yet.</div>
+            {% endif %}
+        </div>
+
+        <!-- Top Picks -->
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">
+            <div style="font-size:1.1rem; font-weight:700; margin-bottom:16px; color:var(--text); display:flex; align-items:center; gap:8px;">
+                <span>🎯</span> Top Recommendations
+            </div>
+            {% if stats.top_recommended %}
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                {% for item in stats.top_recommended[:3] %}
+                <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <div style="flex:1; min-width:0; padding-right:12px;">
+                        <div style="font-weight:700; font-size:0.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:4px;">{{ item.name }}</div>
+                        <span style="font-size:0.6rem; padding:2px 6px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); border-radius:4px; color:var(--cyan);">{{ item.category }}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.1rem; font-weight:800; color:var(--purple);">{{ item.prediction }}%</div>
+                        <div style="font-size:0.55rem; color:var(--muted); text-transform:uppercase;">Hybrid Score</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div style="margin-top:12px; text-align:center;">
+                <a href="/analytics" style="color:var(--cyan); font-size:0.75rem; text-decoration:none; font-weight:600;">View Full Analytics →</a>
+            </div>
+            {% else %}
+            <div style="color:var(--muted); font-size:0.8rem; font-style:italic;">No recommendations yet.</div>
+            {% endif %}
+        </div>
+
+    </div>
+</section>
+
 <!-- How It Works -->
 <section class="section">
     <div class="section-header">
-        <div class="section-label" style="color:var(--purple);">CCLF Model Pipeline</div>
-        <h2 class="section-title">Correlation-Constrained Prediction</h2>
-        <p class="section-desc">Powered by SVD decomposition of behavioral correlation matrices — not simple heuristics.</p>
+        <div class="section-label" style="color:var(--purple);">Hybrid Model Pipeline</div>
+        <h2 class="section-title">Two-Stream Prediction Engine</h2>
+        <p class="section-desc">Behavioral SVD analysis meets NLP semantic understanding — a novel hybrid approach.</p>
     </div>
     <div class="how-grid">
         <div class="how-card">
             <div class="how-icon">🔌</div>
             <div class="how-title">1. Extension Captures</div>
-            <div class="how-desc">Every product page load is tracked. Revisits increment the view count — a strong buying signal. Add-to-cart events are captured automatically.</div>
+            <div class="how-desc">Every product page load is tracked. Revisits increment the view count. Add-to-cart events are captured automatically.</div>
         </div>
         <div class="how-card">
             <div class="how-icon">🔬</div>
             <div class="how-title">2. Feature Extraction</div>
             <div class="how-desc">8 behavioral features are extracted: views, duration, price, recency, velocity, cart status, category affinity, and relative interest.</div>
         </div>
+        <div class="how-card" style="border-color:rgba(236,72,153,0.3); background:rgba(236,72,153,0.04);">
+            <div class="how-icon">🧬</div>
+            <div class="how-title">3. Semantic Embedding</div>
+            <div class="how-desc">Product names are encoded into 384-dimensional dense vectors using a pretrained transformer (all-MiniLM-L6-v2) — capturing the meaning of what you’re browsing.</div>
+        </div>
         <div class="how-card">
             <div class="how-icon">📊</div>
-            <div class="how-title">3. Correlation Matrix</div>
+            <div class="how-title">4. Correlation Matrix</div>
             <div class="how-desc">Pearson correlation matrix is built across all products, then decomposed via SVD into latent factors that capture behavioral patterns.</div>
+        </div>
+        <div class="how-card" style="border-color:rgba(236,72,153,0.3); background:rgba(236,72,153,0.04);">
+            <div class="how-icon">🎯</div>
+            <div class="how-title">5. Semantic Alignment</div>
+            <div class="how-desc">Cosine similarity between the current product and your browsing history measures alignment across 3 dimensions: Functional, Brand/Quality, and Category.</div>
         </div>
         <div class="how-card">
             <div class="how-icon">🧠</div>
-            <div class="how-title">4. CCLF Prediction</div>
-            <div class="how-desc">Correlation-constrained dot product + sigmoid calibration produces a realistic purchase probability. More views & cart = higher score.</div>
+            <div class="how-title">6. Hybrid Fusion</div>
+            <div class="how-desc">Behavioral SVD score (65%) and semantic alignment (35%) are fused via weighted combination. Cold-start products receive higher semantic weight (55%).</div>
         </div>
     </div>
 </section>
@@ -312,8 +387,19 @@ function renderCards(data) {
         const catName = item.category || 'Other';
         const cartTag = item.added_to_cart ? `<span class="lc-cart-tag">🛒 In Cart</span>` : '';
         const loads = item.page_loads || 1;
-        const viewBarWidth = Math.min(loads * 15, 100); // Visual bar: 15% per view, max 100%
+        const viewBarWidth = Math.min(loads * 15, 100);
         const viewIntensity = loads >= 5 ? 'high' : loads >= 3 ? 'medium' : 'low';
+        
+        // Semantic alignment indicator
+        const semScore = item.semantic_score || 0;
+        const semBarWidth = Math.min(semScore, 100);
+        const semColor = semScore >= 60 ? 'var(--pink)' : semScore >= 30 ? 'var(--purple)' : 'var(--muted)';
+        const topSimilar = item.top_similar || [];
+        const semTooltip = topSimilar.length > 0 
+            ? topSimilar.map(s => `${s.name.substring(0,35)}... (${s.similarity}%)`).join('\n')
+            : 'No semantic comparison data yet';
+        const behavScore = item.behavioral_score || item.prediction;
+        const dimScores = item.dimension_scores || {};
         
         // Special badge for Top 3 most likely to be purchased
         let topBadgeHTML = '';
@@ -345,10 +431,26 @@ function renderCards(data) {
                     <div style="height:100%;width:${viewBarWidth}%;background:linear-gradient(90deg,var(--cyan),${viewIntensity==='high'?'var(--emerald)':'var(--purple)'});border-radius:99px;transition:width 0.5s ease;"></div>
                 </div>
             </div>` : ''}
+            ${semScore > 0 ? `<div style="margin-top:6px;" title="${semTooltip}">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-size:0.62rem;color:var(--pink);text-transform:uppercase;letter-spacing:1px;font-weight:600;">🧬 Semantic Alignment</span>
+                    <span style="font-size:0.68rem;color:${semColor};font-weight:700;font-family:'JetBrains Mono',monospace;">${semScore}%</span>
+                </div>
+                <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:99px;margin-top:4px;overflow:hidden;">
+                    <div style="height:100%;width:${semBarWidth}%;background:linear-gradient(90deg,var(--purple),var(--pink));border-radius:99px;transition:width 0.5s ease;"></div>
+                </div>
+                ${topSimilar.length > 0 ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+                    ${topSimilar.slice(0,2).map(s => `<span style="font-size:0.58rem;padding:1px 6px;background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.2);border-radius:4px;color:var(--pink);">${s.name.substring(0,25)}... ${s.similarity}%</span>`).join('')}
+                </div>` : ''}
+            </div>` : ''}
             ${item.price ? `<div class="lc-price">₹ ${item.price}</div>` : ''}
             <div class="lc-score-box">
-                <div class="lc-score-label">Purchase Probability</div>
+                <div class="lc-score-label">Purchase Probability (Hybrid)</div>
                 <div class="lc-score">${item.prediction}%</div>
+                ${semScore > 0 ? `<div style="display:flex;justify-content:center;gap:16px;margin-top:8px;font-size:0.62rem;">
+                    <span style="color:var(--cyan);">Behavioral: ${behavScore}%</span>
+                    <span style="color:var(--pink);">Semantic: ${semScore}%</span>
+                </div>` : ''}
             </div>
         `;
         feed.appendChild(card);
