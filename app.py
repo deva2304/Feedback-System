@@ -45,10 +45,10 @@ except Exception as e:
 SEMANTIC_CACHE = {}
 
 # MDSA Hyperparameters
-OMEGA_BEHAVIORAL = 0.65       # Weight for behavioral SVD score
-OMEGA_SEMANTIC = 0.35         # Weight for semantic alignment score
-OMEGA_COLD_BEHAVIORAL = 0.45  # Cold start: shift weight to semantic
-OMEGA_COLD_SEMANTIC = 0.55    # Cold start: semantic dominates
+OMEGA_BEHAVIORAL = 0.60       # Weight for behavioral SVD score
+OMEGA_SEMANTIC = 0.40         # Weight for semantic alignment score
+OMEGA_COLD_BEHAVIORAL = 0.40  # Cold start: shift weight to semantic
+OMEGA_COLD_SEMANTIC = 0.60    # Cold start: semantic dominates
 SEMANTIC_DECAY_HOURS = 12     # Time decay half-life for semantic weighting
 
 
@@ -168,8 +168,12 @@ def compute_semantic_alignment(current_product_name, current_url, all_sessions, 
     else:
         weighted_avg = 0.0
     
-    # Scale to 0-100 range (cosine sim is typically 0 to 1 for similar products)
-    semantic_score = max(0.0, min(weighted_avg * 100, 100.0))
+    # FIX 6: Nonlinear semantic calibration
+    # Raw cosine sims average 0.1-0.3 for same-domain products.
+    # Square-root stretching maps this to 0.31-0.55, giving the semantic
+    # stream a usable dynamic range for fusion with behavioral scores.
+    calibrated = math.pow(max(weighted_avg, 0.0), 0.5)  # sqrt stretching
+    semantic_score = max(0.0, min(calibrated * 100, 100.0))
     
     # Top 3 most semantically similar products
     similarities.sort(key=lambda x: x['cosine_sim'], reverse=True)
@@ -294,7 +298,7 @@ CATEGORY_KEYWORDS = {
 CATEGORY_ICONS = {
     'Speakers': '🔊', 'Headphones': '🎧', 'Laptops': '💻', 'Mobiles': '📱',
     'Tablets': '📋', 'Cameras': '📷', 'TVs & Displays': '📺', 'Gaming': '🎮',
-    'Wearables': '⌚', 'Storage': '💾', 'Keyboards & Mice': '⌨️',
+    'Wearables': '⌚', 'Storage': '💾', 'Keyboards & Mouse': '⌨️',
     'Networking': '🌐', 'Home Appliances': '🏠', 'Fashion': '👕',
     'Books': '📚', 'Beauty': '💄', 'Sports & Fitness': '🏋️', 'Other': '📦',
 }
@@ -440,19 +444,19 @@ load_captured_history()
 
 # Model hyperparameters
 K_LATENT = 5            # Number of latent factors
-ALPHA_CONFIDENCE = 10   # Confidence scaling: c = 1 + α·log(1+views)  [was 40 → saturation fix]
-LAMBDA_REG = 0.1        # Regularization strength
+ALPHA_CONFIDENCE = 10   # Confidence scaling: c = 1 + α·log(1+views)
+LAMBDA_REG = 0.08       # Tikhonov regularization strength (reduced for sharper SVD)
 SIGMOID_SCALE = 2.8     # Sigmoid steepness
 SIGMOID_SHIFT = -1.2    # Sigmoid horizontal shift
 CART_MULTIPLIER = 1.65  # How much add-to-cart boosts the score
 VIEW_LOG_BASE = 1.8     # Logarithmic view scaling base
-
+PLATT_TAU_BASE = 1.0    # Adaptive Platt temperature base
 
 def extract_features(session, data, all_sessions):
-    """
-    Extract an 8-dimensional behavioral feature vector for a product interaction.
+    r"""
+    Extract an 11-dimensional behavioral feature vector for a product interaction.
     
-    Features:
+    Main effects (f1-f8):
       f1: view_count       - Number of times product page was loaded (log-scaled)
       f2: session_duration  - Total time browsing this product (normalized)
       f3: price_signal      - Inverse price signal (cheaper items score higher)
@@ -461,6 +465,15 @@ def extract_features(session, data, all_sessions):
       f6: cart_signal       - Binary: 1 if added to cart, 0 otherwise
       f7: category_affinity - How many products in the same category were viewed
       f8: relative_interest - This product's views relative to average views across all products
+    
+    Interaction features (f9-f11) — FIX 7:
+      f9:  cart_x_views         - Confirmed interest intensity (cart × view_count)
+      f10: recency_x_velocity   - Active engagement recency (recency × view_velocity)
+      f11: price_x_cart         - Price-conscious cart intent (price_signal × cart_signal)
+    
+    These interaction terms capture compound behavioral patterns that
+    individual features cannot represent, reducing the burden on SVD
+    to discover cross-feature correlations from limited data.
     """
     now = _time.time()
     page_loads = session.get('page_loads', 1)
@@ -469,25 +482,25 @@ def extract_features(session, data, all_sessions):
     duration = max(last_seen - first_seen, 1)
     
     # f1: View count (log-scaled to avoid dominance)
-    view_count = math.log(1 + page_loads) / math.log(1 + 20)  # Normalize to ~[0,1] (20 views ≈ 1.0)
+    view_count = math.log(1 + page_loads) / math.log(1 + 20)  # Normalize to ~[0,1] (20 views = 1.0)
     
     # f2: Session duration (sigmoid-normalized)
-    session_duration = 1 - math.exp(-duration / 300)  # 5 minutes → ~0.63
+    session_duration = 1 - math.exp(-duration / 300)  # 5 minutes -> ~0.63
     
     # f3: Price signal (inverse — cheaper items get higher signal)
-    price_str = str(data.get('price', '0')).replace(',', '').replace('₹', '').replace('$', '').replace('.', '').strip()
+    price_str = str(data.get('price', '0')).replace(',', '').replace('\u20b9', '').replace('$', '').replace('.', '').strip()
     try:
         price_val = float(price_str) if price_str else 0
     except ValueError:
         price_val = 0
     if price_val > 0:
-        price_signal = math.exp(-price_val / 100000)  # ₹1,00,000 → ~0.37
+        price_signal = math.exp(-price_val / 100000)  # 1,00,000 -> ~0.37
     else:
         price_signal = 0.5
     
     # f4: Recency (exponential decay — recent views score higher)
     time_since_last = now - last_seen
-    recency = math.exp(-time_since_last / 3600)  # 1 hour → ~0.37
+    recency = math.exp(-time_since_last / 3600)  # 1 hour -> ~0.37
     
     # f5: View velocity (views per minute — measures engagement intensity)
     if duration > 0:
@@ -502,7 +515,7 @@ def extract_features(session, data, all_sessions):
     product_category = categorize_product(data.get('product_name', ''))
     same_cat_count = sum(1 for s_url, s in all_sessions.items() 
                          if s.get('category', '') == product_category and s_url != normalize_amazon_url(data.get('url', '')))
-    category_affinity = min(same_cat_count / 5, 1.0)  # 5+ same-category → maxed out
+    category_affinity = min(same_cat_count / 5, 1.0)  # 5+ same-category -> maxed out
     
     # f8: Relative interest (this product's views vs avg views)
     all_loads = [s.get('page_loads', 1) for s in all_sessions.values()]
@@ -512,63 +525,103 @@ def extract_features(session, data, all_sessions):
     else:
         relative_interest = 0.5
     
+    # ── Interaction Features (FIX 7) ──
+    # f9: Cart × Views — confirmed interest intensity
+    # A product added to cart AND viewed repeatedly is a strong buy signal
+    cart_x_views = cart_signal * view_count
+    
+    # f10: Recency × Velocity — active engagement recency
+    # Recent AND fast-paced viewing indicates current decision-making
+    recency_x_velocity = recency * view_velocity
+    
+    # f11: Price × Cart — price-conscious cart intent
+    # Captures whether the user is cart-adding expensive vs cheap items
+    price_x_cart = price_signal * cart_signal
+    
     return np.array([
         view_count, session_duration, price_signal, recency,
-        view_velocity, cart_signal, category_affinity, relative_interest
+        view_velocity, cart_signal, category_affinity, relative_interest,
+        cart_x_views, recency_x_velocity, price_x_cart
     ])
 
 FEATURE_NAMES = [
     'view_count', 'session_duration', 'price_signal', 'recency',
-    'view_velocity', 'cart_signal', 'category_affinity', 'relative_interest'
+    'view_velocity', 'cart_signal', 'category_affinity', 'relative_interest',
+    'cart_x_views', 'recency_x_velocity', 'price_x_cart'
 ]
 
 
 def build_correlation_matrix(feature_vectors, time_weights=None):
-    """
+    r"""
     Build a Time-Decayed Pearson correlation matrix with Tikhonov Regularization.
-    C_decay = X^T W X + λI
     
-    Returns: (n_features × n_features) correlation matrix
+    FIX 1: Proper weighted Pearson normalization.
+    
+    When time-decay weights W are applied, the denominator must reflect
+    the effective sample size from the weight matrix, not the raw count n.
+    
+    Mathematical formulation:
+      X_c = X - \bar{X}_w           (weighted centering)
+      C_{decay} = \frac{X_c^T W X_c}{\sum w_i - 1} + \lambda I
+    
+    Returns: (n_features x n_features) correlation matrix
     """
+    n_feat = feature_vectors[0].shape[0] if feature_vectors else 11
+    
     if len(feature_vectors) < 2:
         # Not enough data for meaningful correlation — use identity
-        n = feature_vectors[0].shape[0] if feature_vectors else 8
-        return np.eye(n)
+        return np.eye(n_feat)
     
-    # Stack into matrix (n_products × n_features)
+    # Stack into matrix (n_products x n_features)
     X = np.array(feature_vectors)
     
-    # Center the features
-    X_centered = X - X.mean(axis=0)
+    # Weighted mean for centering (FIX 1)
+    if time_weights is not None:
+        w = np.array(time_weights)
+        w_sum = np.sum(w)
+        if w_sum < 1e-8:
+            w = np.ones(X.shape[0])
+            w_sum = float(X.shape[0])
+        # Weighted mean
+        weighted_mean = (w[:, None] * X).sum(axis=0) / w_sum
+        X_centered = X - weighted_mean
+        W = np.diag(w)
+        # Effective sample size for weighted Pearson
+        effective_n = w_sum
+    else:
+        X_centered = X - X.mean(axis=0)
+        W = np.eye(X.shape[0])
+        effective_n = float(X.shape[0])
     
-    # Compute correlation matrix with stability guard
-    std = X.std(axis=0)
+    # Compute weighted standard deviation for normalization
+    if time_weights is not None:
+        w_var = (w[:, None] * (X_centered ** 2)).sum(axis=0) / w_sum
+        std = np.sqrt(w_var)
+    else:
+        std = X.std(axis=0)
     std[std < 1e-8] = 1.0  # Prevent division by zero
     X_normalized = X_centered / std
     
-    # Time-decay weighting (Ebbinghaus)
-    if time_weights is not None:
-        W = np.diag(time_weights)
-    else:
-        W = np.eye(X.shape[0])
-    
-    n = X.shape[0]
-    corr_matrix = (X_normalized.T @ W @ X_normalized) / max(n - 1, 1)
+    # Weighted correlation (FIX 1: use effective_n - 1 as denominator)
+    denominator = max(effective_n - 1.0, 1.0)
+    corr_matrix = (X_normalized.T @ W @ X_normalized) / denominator
     
     # Tikhonov Regularization (L2) to guarantee numerical stability
     corr_matrix += LAMBDA_REG * np.eye(corr_matrix.shape[0])
     
-    # Clamp to [-1, 1] for numerical stability
+    # Clamp to [-1, 1] for numerical stability (off-diagonal only)
+    diag = np.diag(corr_matrix).copy()
     corr_matrix = np.clip(corr_matrix, -1, 1)
+    np.fill_diagonal(corr_matrix, diag)  # Preserve diagonal > 1 from regularization
     
     return corr_matrix
 
 
 def compute_latent_factors(corr_matrix, k=K_LATENT):
-    """
+    r"""
     Decompose the correlation matrix using SVD to extract latent factors.
     
-    R = U × Σ × V^T
+    R = U \times \Sigma \times V^T
     
     The top-k singular values and vectors capture the dominant 
     patterns of correlated behavior. These are the 'latent factors'
@@ -584,6 +637,9 @@ def compute_latent_factors(corr_matrix, k=K_LATENT):
         U_k = U[:, :k]
         sigma_k = sigma[:k]
         Vt_k = Vt[:k, :]
+        
+        # Ensure numerical positivity of singular values
+        sigma_k = np.maximum(sigma_k, 1e-6)
         
         return U_k, sigma_k, Vt_k
     except np.linalg.LinAlgError:
@@ -609,19 +665,21 @@ def calculate_purchase_chance(data):
     1. Ebbinghaus Time Decay for novelty scaling
     2. Tikhonov (L2) Regularized SVD inversion
     3. Implicit Feedback Confidence Matrix (Hu, Koren & Volinsky, 2008)
-    4. Temperature-calibrated Platt Scaling probability mapping
+    4. Adaptive Temperature-calibrated Platt Scaling probability mapping
+    5. L2-normalized user latent vectors with confidence scaling (FIX 2)
+    6. Proper CCLF whitening via inverse singular values (FIX 3)
+    7. Adaptive score distribution normalization (FIXES 4 & 5)
     
     Mathematical formulation:
-      Feature vector:  x_i ∈ R^8
+      Feature vector:  x_i \in R^{11}
       Time Weights:    W = diag(e^{-t / \lambda_{decay}})
-      Correlation:     C_{reg} = X^T W X / (n-1) + \lambda I
-      SVD:             C_{reg} = U Σ V^T
-      Confidence:      c_{uj} = 1 + \alpha_{views} + \beta_{cart} + \gamma_{cat}
-      User latent:     p_u = \frac{\sum (c_{uj} \cdot U^T x_j)}{\sum c_{uj}}
+      Correlation:     C_{reg} = X^T W X / (\sum w - 1) + \lambda I   (FIX 1)
+      SVD:             C_{reg} = U \Sigma V^T
+      Confidence:      c_{uj} = 1 + \alpha \log(1+views) + \beta \cdot cart + \gamma \cdot affinity
+      User latent:     p_u = L2Norm(\sum c_{uj} \cdot U^T x_j) \times tanh(C_eff)  (FIX 2)
       Item latent:     q_i = U^T x_i
-      Constrained:     q_adj = \Sigma^{-1/2} q_i
-      Raw score:       s = p_u · diag(Σ) · q_adj
-      Final Prob:      P(y=1) = \sigma(\frac{s - \mu}{\tau})   (Platt scale)
+      Whitened:        s = p_u \cdot q_i    (after \Sigma^{-1} whitening, FIX 3)
+      Adaptive Platt:  P(y=1) = \sigma(\alpha_s \cdot \frac{s - \mu_s}{\sigma_s})  (FIX 5)
     """
     raw_url = data.get('url', 'unknown')
     url = normalize_amazon_url(raw_url)
@@ -695,14 +753,16 @@ def calculate_purchase_chance(data):
     # ── Step 5: Project feature vector into latent space ──
     item_latent = U_k.T @ feature_vec[:U_k.shape[0]]
     
-    # ── Step 6: Compute User Latent Vector via Implicit Confidence (Hu, Koren, Volinsky) ──
+    # ── Step 6: Compute User Latent Vector via Implicit Confidence ──
+    # (Hu, Koren, Volinsky 2008 — with L2 normalization, FIX 2)
     user_latent = np.zeros(len(sigma_k))
-    total_weight = 0
+    total_confidence = 0.0
+    confidences = []
     
     for i, s_url in enumerate(all_urls):
         s = EXTERNAL_SESSIONS.get(s_url, {})
         
-        # c_ui = 1 + α*log(views) + β*cart + γ*affinity
+        # c_ui = 1 + alpha*log(views) + beta*cart + gamma*affinity
         c_ui = 1.0 
         c_ui += ALPHA_CONFIDENCE * math.log(1 + s.get('page_loads', 1))
         c_ui += 20.0 if s.get('added_to_cart') else 0.0
@@ -712,50 +772,93 @@ def calculate_purchase_chance(data):
         proj = U_k.T @ fv[:U_k.shape[0]]
         
         user_latent += c_ui * proj
-        total_weight += c_ui
+        total_confidence += c_ui
+        confidences.append(c_ui)
     
-    # Soft-normalization (Confidence Damping)
-    # Instead of dividing by total_weight (which cancels out confidence for single items),
-    # we divide by log(2 + total_weight) so that higher absolute engagement = larger intent vector.
-    if total_weight > 0:
-        user_latent /= math.log(2 + total_weight)
+    # FIX 2: L2-normalize then scale by bounded confidence
+    # This prevents the user vector from exploding in magnitude while
+    # still preserving the confidence-weighted direction.
+    user_norm = np.linalg.norm(user_latent)
+    if user_norm > 1e-8:
+        user_latent = user_latent / user_norm
+        # Bounded confidence scaling: tanh maps [0, inf) -> [0, 1)
+        # Dividing by (ALPHA_CONFIDENCE * len(all_urls)) normalizes by
+        # expected baseline confidence, so only ABOVE-average engagement
+        # pushes the magnitude toward 1.0
+        expected_baseline = ALPHA_CONFIDENCE * max(len(all_urls), 1) * math.log(2)
+        effective_confidence = math.tanh(total_confidence / max(expected_baseline, 1.0))
+        user_latent *= effective_confidence
     
-    # ── Step 7: Correlation-constrained adjustment ──
+    # ── Step 7: Correlation-constrained whitening (FIX 3) ──
+    # Proper CCLF whitening uses Sigma^{-1} to decorrelate the latent space.
+    # This ensures that correlated features (large sigma) are penalized,
+    # and unique discriminative features (small sigma) are amplified.
+    # 
+    # Without FIX 3, the code used 1/sqrt(sigma) * sigma = sqrt(sigma),
+    # which BOOSTED correlated features — the opposite of CCLF design.
     try:
-        eigenvalues = np.maximum(sigma_k, 0.01)
-        constraint_weights = 1.0 / np.sqrt(eigenvalues)
-        constraint_weights /= np.max(constraint_weights)  # Normalize
+        eigenvalues = np.maximum(sigma_k, 1e-4)
+        # Whitening weights: 1/sigma_k, normalized to [0,1]
+        whitening_weights = 1.0 / eigenvalues
+        whitening_weights /= np.max(whitening_weights)  # Normalize
     except Exception:
-        constraint_weights = np.ones(len(sigma_k))
+        whitening_weights = np.ones(len(sigma_k))
     
-    # ── Step 8: Compute constrained dot product score ──
-    raw_score = np.sum(user_latent * sigma_k * item_latent * constraint_weights)
+    # ── Step 8: Compute whitened dot product score ──
+    # score = user_latent . (whitening_weights * item_latent)
+    # This is the proper whitened scoring in the latent space
+    raw_score = float(np.sum(user_latent * whitening_weights * item_latent))
     
-    # Normalize raw score by product count to prevent catalog-size saturation
+    # FIX 4: NO product-count normalization!
+    # With L2-normalized user vectors and bounded confidence scaling,
+    # the raw score is naturally bounded in [-1, 1].
+    # The old code divided by (1 + n_products * 0.5) which crushed all scores
+    # into the flat middle of the sigmoid at ~50%.
     n_products = len(EXTERNAL_SESSIONS)
-    raw_score = raw_score / (1.0 + n_products * 0.5)
     
-    # ── Step 9: Platt Scaling for Probability Output ──
-    # P(purchase) = sigmoid((s - mu) / tau)
-    tau_temp = 3.5   # Temperature parameter (wider spread)
-    mu_shift = 0.0   # Center sigmoid at neutral 50%
+    # ── Step 9: Adaptive Platt Scaling (FIX 5) ──
+    # Instead of hardcoded tau/mu, compute the score's position relative
+    # to all other products' scores for adaptive calibration.
+    all_scores = []
+    for i, s_url in enumerate(all_urls):
+        fv_i = all_feature_vecs[i]
+        item_i = U_k.T @ fv_i[:U_k.shape[0]]
+        score_i = float(np.sum(user_latent * whitening_weights * item_i))
+        all_scores.append(score_i)
     
-    logit = (raw_score - mu_shift) / tau_temp
+    # Z-score normalization against the current product population
+    if len(all_scores) >= 2:
+        mu_scores = np.mean(all_scores)
+        sigma_scores = np.std(all_scores)
+        if sigma_scores < 1e-8:
+            sigma_scores = 1.0
+        z_score = (raw_score - mu_scores) / sigma_scores
+    else:
+        z_score = raw_score
+    
+    # Adaptive temperature: tau adapts based on data richness
+    tau_adaptive = PLATT_TAU_BASE + 0.5 / max(n_products, 1)
+    logit = SIGMOID_SCALE * z_score / tau_adaptive
+    
+    # Cart signal: strong but bounded intent indicator
+    if session.get('added_to_cart'):
+        logit += CART_MULTIPLIER
+    
     # Cap logit to prevent overflow
     logit_capped = max(min(logit, 10), -10)
     
     probability = 1.0 / (1.0 + math.exp(-logit_capped))
     
-    # Scale to percentage with realistic bounds
+    # Scale to percentage
     purchase_pct = probability * 100
     
-    # Apply correlation-based confidence adjustment
-    # More data = more confident = wider range of predictions
-    confidence_factor = min(n_products / 5, 1.0)  # Full confidence at 5+ products
+    # Apply confidence-based range adjustment
+    # More data = more confident = wider spread from base rate
+    confidence_factor = min(n_products / 4, 1.0)  # Full confidence at 4+ products
     
     # Blend toward base rate for low confidence
-    base_rate = 12.0  # Base purchase probability with minimal data
-    purchase_pct = base_rate + (purchase_pct - base_rate) * (0.4 + 0.6 * confidence_factor)
+    base_rate = 15.0  # Base purchase probability with minimal data
+    purchase_pct = base_rate + (purchase_pct - base_rate) * (0.5 + 0.5 * confidence_factor)
     
     # Clamp behavioral score to realistic bounds
     behavioral_pct = max(3.0, min(purchase_pct, 97.0))
@@ -765,7 +868,7 @@ def calculate_purchase_chance(data):
     # ══════════════════════════════════════════════════════════
     #
     #  Hybrid Two-Stream Fusion:
-    #    final = ω_b × behavioral_score + ω_s × semantic_score
+    #    final = omega_b * behavioral_score + omega_s * semantic_score
     #
     #  Cold-Start Adaptation:
     #    When page_loads == 1 (first view), semantic weight increases
